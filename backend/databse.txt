@@ -1,0 +1,36 @@
+CREATE TABLE tbl_register (
+    register_id SERIAL PRIMARY KEY,
+    phone VARCHAR(15) UNIQUE NOT NULL,
+    store_name VARCHAR(255) NOT NULL,
+    email_id VARCHAR(255) UNIQUE NOT NULL,
+    created_at TIMESTAMP DEFAULT NOW()
+);
+CREATE TABLE tbl_login (
+    user_id SERIAL PRIMARY KEY,
+    phone VARCHAR(15) UNIQUE NOT NULL,
+    register_id INT,
+    otp VARCHAR(6),
+    user_role VARCHAR(10) CHECK (user_role IN ('admin','user')) NOT NULL,
+    created_at TIMESTAMP DEFAULT NOW(),
+
+    CONSTRAINT fk_register
+        FOREIGN KEY (register_id)
+        REFERENCES tbl_register (register_id)
+        ON DELETE SET NULL
+);
+CREATE TABLE tbl_address (
+    address_id SERIAL PRIMARY KEY,
+    user_id INT NOT NULL,
+    name VARCHAR(255) NOT NULL,
+    address TEXT NOT NULL,
+    state VARCHAR(100) NOT NULL,
+    city VARCHAR(100) NOT NULL,
+    pincode VARCHAR(10) NOT NULL,
+    type VARCHAR(20) CHECK (type IN ('home','office','apartment')),
+    created_at TIMESTAMP DEFAULT NOW(),
+
+    CONSTRAINT fk_user
+        FOREIGN KEY (user_id)
+        REFERENCES tbl_login (user_id)
+        ON DELETE CASCADE
+);
