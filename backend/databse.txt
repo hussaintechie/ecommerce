@@ -5,18 +5,15 @@ CREATE TABLE tbl_register (
     email_id VARCHAR(255) UNIQUE NOT NULL,
     created_at TIMESTAMP DEFAULT NOW()
 );
-CREATE TABLE tbl_login (
+CREATE TABLE tbl_users (
     user_id SERIAL PRIMARY KEY,
-    phone VARCHAR(15) UNIQUE NOT NULL,
-    register_id INT,
-    otp VARCHAR(6),
-    user_role VARCHAR(10) CHECK (user_role IN ('admin','user')) NOT NULL,
-    created_at TIMESTAMP DEFAULT NOW(),
-
-    CONSTRAINT fk_register
-        FOREIGN KEY (register_id)
-        REFERENCES tbl_register (register_id)
-        ON DELETE SET NULL
+    email VARCHAR(255) UNIQUE NOT NULL,
+   
+    password VARCHAR(255),          -- Nullable (OTP-only login users may not have password)
+    otp VARCHAR(6),                 -- For OTP login
+    user_role VARCHAR(10) CHECK (user_role IN ('admin','user')) NOT NULL DEFAULT 'user',
+    is_first_login BOOLEAN DEFAULT TRUE,  -- To detect first-time login
+    created_at TIMESTAMP DEFAULT NOW()
 );
 CREATE TABLE tbl_address (
     address_id SERIAL PRIMARY KEY,
@@ -31,6 +28,6 @@ CREATE TABLE tbl_address (
 
     CONSTRAINT fk_user
         FOREIGN KEY (user_id)
-        REFERENCES tbl_login (user_id)
+        REFERENCES tbl_users (user_id)
         ON DELETE CASCADE
 );
