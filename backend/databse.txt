@@ -5,29 +5,28 @@ CREATE TABLE tbl_register (
     email_id VARCHAR(255) UNIQUE NOT NULL,
     created_at TIMESTAMP DEFAULT NOW()
 );
-CREATE TABLE tbl_users (
+CREATE TABLE tbl_login (
     user_id SERIAL PRIMARY KEY,
+    register_id INT NOT NULL,
     email VARCHAR(255) UNIQUE NOT NULL,
-   
-    password VARCHAR(255),          -- Nullable (OTP-only login users may not have password)
-    otp VARCHAR(6),                 -- For OTP login
+    password VARCHAR(255),
+    otp VARCHAR(6),
     user_role VARCHAR(10) CHECK (user_role IN ('admin','user')) NOT NULL DEFAULT 'user',
-    is_first_login BOOLEAN DEFAULT TRUE,  -- To detect first-time login
-    created_at TIMESTAMP DEFAULT NOW()
-);
-CREATE TABLE tbl_address (
-    address_id SERIAL PRIMARY KEY,
-    user_id INT NOT NULL,
-    name VARCHAR(255) NOT NULL,
-    address TEXT NOT NULL,
-    state VARCHAR(100) NOT NULL,
-    city VARCHAR(100) NOT NULL,
-    pincode VARCHAR(10) NOT NULL,
-    type VARCHAR(20) CHECK (type IN ('home','office','apartment')),
+    is_first_login BOOLEAN DEFAULT TRUE,
     created_at TIMESTAMP DEFAULT NOW(),
 
-    CONSTRAINT fk_user
-        FOREIGN KEY (user_id)
-        REFERENCES tbl_users (user_id)
+    CONSTRAINT fk_login_register FOREIGN KEY (register_id)
+        REFERENCES tbl_register (register_id)
         ON DELETE CASCADE
+);
+
+CREATE TABLE tbl_tenant_databases (
+    tenant_id SERIAL PRIMARY KEY,
+    register_id INT REFERENCES tbl_register(register_id),
+    db_name VARCHAR(255) UNIQUE,
+    db_host VARCHAR(255) DEFAULT 'localhost',
+    db_user VARCHAR(255),
+    db_pass VARCHAR(255),
+    port int,
+    created_at TIMESTAMP DEFAULT NOW()
 );
