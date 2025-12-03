@@ -1,17 +1,27 @@
-CREATE TABLE IF NOT EXISTS tbl_address (
-    address_id SERIAL PRIMARY KEY,
-    user_id INT NOT NULL,
-    name VARCHAR(255),
-    phone VARCHAR(15),
-    address TEXT,
-    state VARCHAR(100),
-    city VARCHAR(100),
-    pincode VARCHAR(10),
-    type VARCHAR(20),
-    latitude DOUBLE PRECISION,
-    longitude DOUBLE PRECISION,
-    created_at TIMESTAMP DEFAULT NOW()
+CREATE TABLE address (
+    address_id      SERIAL PRIMARY KEY,     -- or INT AUTO_INCREMENT for MySQL
+    user_id         INT NOT NULL,
+    store_id        integer 
+    name            VARCHAR(100),
+    phone           VARCHAR(15),
+
+    state           VARCHAR(100),
+    city            VARCHAR(100),
+    district        VARCHAR(100),
+    street          VARCHAR(255),
+    landmark        VARCHAR(255),
+
+    pincode         VARCHAR(10),
+    address_type    VARCHAR(50),            -- home / work / other
+
+    lat             DECIMAL(10,6),
+    lng             DECIMAL(10,6),
+
+    created_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+
+   
 );
+
 CREATE TABLE IF NOT EXISTS tbl_master_categories (
     categories_id SERIAL PRIMARY KEY,
     categories_name VARCHAR(255),
