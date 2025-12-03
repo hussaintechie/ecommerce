@@ -7,7 +7,7 @@ CREATE TABLE tbl_register (
 );
 CREATE TABLE tbl_login (
     user_id SERIAL PRIMARY KEY,
-    register_id INT NOT NULL,
+    register_id INT ,
     email VARCHAR(255) UNIQUE NOT NULL,
     password VARCHAR(255),
     otp VARCHAR(6),

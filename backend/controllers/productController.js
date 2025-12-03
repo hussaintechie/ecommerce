@@ -1,79 +1,8 @@
 import pool from "../config/masterDB.js";
 import XLSX from "xlsx";
 import { getTenantPool } from "../config/tenantDB.js";
-import productmodel from "../model/productmodel.js";
+import productmodel from "../models/productModel.js";
 
-// IMPORT MODEL FUNCTIONS
-import { insertProduct, insertProductImage } from "../models/productModel.js";
-
-export const addCategoryProduct = async (req, res) => {
-  try {
-    const {
-      store_id,
-      category_id,   // <-- category_id comes from frontend
-      title,
-      description,
-      price,
-      mrp,
-      quantity,
-      thumbnail,
-      images
-    } = req.body;
-
-    if (
-      !store_id ||
-      !category_id ||
-      !title ||
-      !price ||
-      !mrp ||
-      !quantity ||
-      !thumbnail
-    ) {
-      return res.status(400).json({
-        message: "All fields are required",
-      });
-    }
-
-    // 1. GET TENANT DB NAME USING STORE_ID
-    const result = await pool.query(
-      "SELECT db_name FROM tbl_tenant_databases WHERE register_id=$1",
-      [store_id]
-    );
-
-    if (result.rows.length === 0)
-      return res.status(400).json({ message: "Store not found" });
-
-    const tenantDB = getTenantPool(result.rows[0].db_name);
-
-    // 2. INSERT PRODUCT using model
-    const productId = await insertProduct(tenantDB, {
-      category_id,
-      title,
-      description,
-      price,
-      mrp,
-      quantity,
-      thumbnail,
-    });
-
-    // 3. INSERT MULTIPLE IMAGES using model
-    if (Array.isArray(images)) {
-      for (let img of images) {
-        await insertProductImage(tenantDB, productId, img);
-      }
-    }
-
-    res.json({
-      status: 1,
-      message: "Product + Images added successfully",
-      product_id: productId,
-    });
-
-  } catch (err) {
-    console.error("Add Product Error:", err);
-    res.status(500).json({ error: err.message });
-  }
-};
 
 export const neweditcategory = async (req, res) => {
 
@@ -271,5 +200,76 @@ export const orderdatas = async (req, res) => {
     });
   }
 };
+export const addProduct = async (req, res) => {
+  try {
+    const { store_id, products } = req.body;
 
+    if (!store_id) {
+      return res.status(400).json({ status: 0, message: "store_id is required" });
+    }
+
+    if (!Array.isArray(products) || products.length === 0) {
+      return res.status(400).json({ status: 0, message: "products array required" });
+    }
+
+    // Get Tenant DB
+    const tenantQuery = `
+      SELECT db_name FROM tbl_tenant_databases WHERE register_id = $1
+    `;
+    const result = await pool.query(tenantQuery, [store_id]);
+
+    if (result.rows.length === 0) {
+      return res.status(400).json({ status: 0, message: "Store not found" });
+    }
+
+    const tenantDB = getTenantPool(result.rows[0].db_name);
+
+    // Call Model
+    const response = await productmodel.addProductsManual(tenantDB, products);
+
+    return res.status(200).json(response);
+
+  } catch (err) {
+    console.error("Add Product Error:", err);
+    return res.status(500).json({ status: 0, message: "Server error", error: err.message });
+  }
+};
+
+export const getProductsByCategory = async (req, res) => {
+  try {
+    const { store_id } = req.body;
+
+    if (!store_id) {
+      return res.status(400).json({ status: 0, message: "store_id required" });
+    }
+
+    // Find tenant DB
+    const tenantQuery = `
+      SELECT db_name 
+      FROM tbl_tenant_databases 
+      WHERE register_id = $1
+    `;
+
+    const result = await pool.query(tenantQuery, [store_id]);
+
+    if (result.rows.length === 0) {
+      return res.status(400).json({ status: 0, message: "Store not found" });
+    }
+
+    const tenantDB = getTenantPool(result.rows[0].db_name);
+
+    // Call Model
+    const response = await productmodel.getProductsByCategory(tenantDB);
+
+    return res.status(200).json({
+      status: 1,
+      message: "Success",
+      data: response
+    });
+
+  } catch (err) {
+    console.error("Get Category Wise Product Error:", err);
+    return res.status(500).json({ status: 0, message: "Server error", error: err.message });
+  }
+};
 

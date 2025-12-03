@@ -4,6 +4,7 @@ import fs from "fs";
 import path from "path";
 import nodemailer from "nodemailer";
 
+
 export const adminRegister = async (req, res) => {
   try {
     const { phone, store_name, email_id } = req.body;
@@ -100,33 +101,42 @@ export const login = async (req, res) => {
       );
 
       if (userCheck.rows.length === 0) {
-        // Check if admin exists
+        // Check if email belongs to an admin
         const adminCheck = await pool.query(
           "SELECT * FROM tbl_register WHERE email_id=$1",
           [email]
         );
 
         let role = "user";
-        let registerId = null;
+        let registerId;
 
         if (adminCheck.rows.length > 0) {
+          // Admin login
           role = "admin";
           registerId = adminCheck.rows[0].register_id;
+        } else {
+          // New user → Assign to only store for now
+          const store = await pool.query(
+            "SELECT register_id FROM tbl_register LIMIT 1"
+          );
+          registerId = store.rows[0].register_id;
         }
 
+        // Insert new login row
         await pool.query(
           `INSERT INTO tbl_login (email, user_role, register_id, otp)
            VALUES ($1,$2,$3,$4)`,
           [email, role, registerId, newOtp]
         );
       } else {
+        // Existing user → Update OTP
         await pool.query(`UPDATE tbl_login SET otp=$1 WHERE email=$2`, [
           newOtp,
           email,
         ]);
       }
 
-      // Send OTP Mail
+      // Send OTP mail
       const transporter = nodemailer.createTransport({
         service: "gmail",
         auth: { user: process.env.MAIL_USER, pass: process.env.MAIL_PASS },
@@ -142,7 +152,7 @@ export const login = async (req, res) => {
     }
 
     // ===============================
-    // STEP 2: NORMAL LOGIN (OTP/PASSWORD)
+    // STEP 2: NORMAL LOGIN
     // ===============================
     const userCheck = await pool.query(
       "SELECT * FROM tbl_login WHERE email=$1",
@@ -151,12 +161,12 @@ export const login = async (req, res) => {
 
     let user = userCheck.rows[0];
 
-    // ----------------------------------
-    // AUTO SIGNUP FOR NEW USER
-    // ----------------------------------
+    // -------------------------------------
+    // AUTO SIGNUP (when logging in first time)
+    // -------------------------------------
     if (!user) {
       let role = "user";
-      let registerId = null;
+      let registerId;
 
       const adminCheck = await pool.query(
         "SELECT * FROM tbl_register WHERE email_id=$1",
@@ -166,6 +176,11 @@ export const login = async (req, res) => {
       if (adminCheck.rows.length > 0) {
         role = "admin";
         registerId = adminCheck.rows[0].register_id;
+      } else {
+        const store = await pool.query(
+          "SELECT register_id FROM tbl_register LIMIT 1"
+        );
+        registerId = store.rows[0].register_id;
       }
 
       const insert = await pool.query(
@@ -184,9 +199,9 @@ export const login = async (req, res) => {
       });
     }
 
-    // -------------------------------
+    // ===============================
     // OTP LOGIN
-    // -------------------------------
+    // ===============================
     if (otp) {
       if (user.otp !== otp)
         return res.status(400).json({ message: "Invalid OTP" });
@@ -199,7 +214,6 @@ export const login = async (req, res) => {
           "SELECT db_name FROM tbl_tenant_databases WHERE register_id=$1",
           [user.register_id]
         );
-
         user.tenant_db = tenant.rows[0].db_name;
       }
 
@@ -212,24 +226,22 @@ export const login = async (req, res) => {
       });
     }
 
-    // -------------------------------
+    // ===============================
     // PASSWORD LOGIN
-    // -------------------------------
+    // ===============================
     if (password) {
-      // FIRST TIME CREATE PASSWORD
+      // First time setting password
       if (!user.password) {
         await pool.query(`UPDATE tbl_login SET password=$1 WHERE email=$2`, [
           password,
           email,
         ]);
 
-        // Attach tenant DB
         if (user.user_role === "admin") {
           const tenant = await pool.query(
             "SELECT db_name FROM tbl_tenant_databases WHERE register_id=$1",
             [user.register_id]
           );
-
           user.tenant_db = tenant.rows[0].db_name;
         }
 
@@ -242,17 +254,15 @@ export const login = async (req, res) => {
         });
       }
 
-      // CHECK PASSWORD
+      // Normal password login
       if (user.password !== password)
         return res.status(400).json({ message: "Incorrect password" });
 
-      // Attach tenant DB
       if (user.user_role === "admin") {
         const tenant = await pool.query(
           "SELECT db_name FROM tbl_tenant_databases WHERE register_id=$1",
           [user.register_id]
         );
-
         user.tenant_db = tenant.rows[0].db_name;
       }
 
@@ -264,11 +274,13 @@ export const login = async (req, res) => {
         tenant_db: user.tenant_db || null,
       });
     }
+
   } catch (err) {
     console.error("Login Error:", err);
     return res.status(500).json({ message: "Login failed" });
   }
 };
+
 export const forgotPassword = async (req, res) => {
   try {
     const { email } = req.body;
