@@ -2,7 +2,7 @@ import express from "express";
 import cors from "cors";
 import authRoutes from "./routes/authRoutes.js";
 import  productRouter from "./routes/productRouter.js";
-import categoryModel from "./routes/categoryRouter.js";
+import path from "path";
 import customerRoutes from "./routes/customerRoutes.js";
 
 import dotenv from "dotenv";
@@ -14,10 +14,9 @@ app.use(express.json());
 
 app.use("/auth", authRoutes);
 
-app.use("/cat",categoryModel)
-app.use("/pro",productRouter)
+app.use("/product",productRouter)
 app.use("/customer",customerRoutes)
-
+app.use('/uploads', express.static('uploads'));
 
 const PORT = 5000;
 

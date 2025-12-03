@@ -4,6 +4,7 @@ import fs from "fs";
 import path from "path";
 import nodemailer from "nodemailer";
 
+
 export const adminRegister = async (req, res) => {
   try {
     const { phone, store_name, email_id } = req.body;
