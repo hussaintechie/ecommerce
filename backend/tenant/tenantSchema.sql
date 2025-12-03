@@ -1,14 +1,18 @@
 CREATE TABLE IF NOT EXISTS tbl_address (
     address_id SERIAL PRIMARY KEY,
-    user_id INT,
+    user_id INT NOT NULL,
     name VARCHAR(255),
+    phone VARCHAR(15),
     address TEXT,
     state VARCHAR(100),
     city VARCHAR(100),
     pincode VARCHAR(10),
     type VARCHAR(20),
+    latitude DOUBLE PRECISION,
+    longitude DOUBLE PRECISION,
     created_at TIMESTAMP DEFAULT NOW()
 );
+
 
 CREATE TABLE IF NOT EXISTS tbl_master_categories (
     categories_id SERIAL PRIMARY KEY,
