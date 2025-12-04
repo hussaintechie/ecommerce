@@ -99,3 +99,12 @@ CREATE TABLE IF NOT EXISTS tbl_product_images (
     image_url TEXT NOT NULL,
     created_at TIMESTAMP DEFAULT NOW()
 );
+
+create table favorites (
+fav_id serial primary key,
+user_id int not null,
+product_id int not null,
+created_at timestamp default now(),
+unique(user_id,product_id)
+
+)
