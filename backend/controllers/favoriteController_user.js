@@ -33,13 +33,25 @@ export const toggleFavorite = async (req, res) => {
 };
 export const getFavorites = async (req, res) => {
   try {
-    const { user_id, store_id } = req.query;
+    const user_id = req.params.user_id;   // <-- URL PARAM
+    const store_id = req.query.store_id;  // <-- QUERY PARAM
+
+    if (!user_id || !store_id) {
+      return res.status(400).json({
+        status: 0,
+        message: "Missing user_id or store_id"
+      });
+    }
 
     const tenantPool = await FavoriteModel.getTenantDB(store_id);
 
     const data = await FavoriteModel.listFavorites(tenantPool, user_id);
 
-    res.json(data);
+    return res.json({
+      status: 1,
+      favorites: data
+    });
+
   } catch (error) {
     res.status(500).json({ message: error.message });
   }

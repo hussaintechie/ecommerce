@@ -1,5 +1,5 @@
-import pool from "../config/masterDB";
-import getTenantPool from "../config/tenantDB";
+import pool from "../config/masterDB.js";
+import {getTenantPool} from "../config/tenantDB.js";
 
 export const FavoriteModel = {
   getTenantDB: async (store_id) => {
@@ -29,13 +29,13 @@ export const FavoriteModel = {
   checkFavorite: async (tenantPool, user_id, product_id) => {
     const result = await tenantPool.query(
       `
-      select fav_id from tbl_favorites where user_id=$1 AND product_id=%2`,
+      select fav_id from tbl_favorites where user_id=$1 AND product_id=$2`,
       [user_id, product_id]
     );
     return result.rows;
   },
   listFavorites: async (tenantPool, user_id) => {
-    const result = await tenantPool.pool(`
+    const result = await tenantPool.query(`
       SELECT  f.fav_id,p.* from tbl_favorites f
       JOIN tbl_master_product P ON f.product_id=p.product_id
       WHERE f.user_id= $1

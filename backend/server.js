@@ -5,6 +5,7 @@ import  productRouter from "./routes/productRouter.js";
 import path from "path";
 import customerRoutes from "./routes/customerRoutes.js";
 import addressModel_user from "./routes/addressRouter_user.js"
+import favoriteRoutes_user from "./routes/favoriteRoutes_user.js"
 
 import dotenv from "dotenv";
 dotenv.config();
@@ -14,6 +15,7 @@ app.use(cors());
 app.use(express.json());
 
 app.use("/auth", authRoutes);
+app.use("/user",favoriteRoutes_user)
 
 app.use("/product",productRouter)
 app.use("/customer",customerRoutes)

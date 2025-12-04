@@ -100,7 +100,7 @@ CREATE TABLE IF NOT EXISTS tbl_product_images (
     created_at TIMESTAMP DEFAULT NOW()
 );
 
-create table favorites (
+create table tbl_favorites (
 fav_id serial primary key,
 user_id int not null,
 product_id int not null,
