@@ -11,6 +11,7 @@ export const addAddress = async (req, res) => {
       phone,
       pincode,
       state,
+      Building,
       district,
       city,
       street,
@@ -29,6 +30,7 @@ export const addAddress = async (req, res) => {
       phone,
       pincode,
       state,
+      Building,
       district,
       city,
       street,
@@ -136,27 +138,64 @@ export const getAddressDetails = async (req, res) => {
   }
 };
 
-
 export const autoFillCurrentLocation = async (req, res) => {
   try {
     const { lat, lng } = req.query;
 
-    const googleURL = `https://maps.googleapis.com/maps/api/geocode/json?latlng=${lat},${lng}&key=${process.env.GOOGLE_API_KEY}`;
+    if (!lat || !lng) {
+      return res.status(400).json({ status: 0, message: "lat & lng required" });
+    }
 
-    const geo = await fetch(googleURL).then((r) => r.json());
+    const key = process.env.GOOGLE_API_KEY;
 
-    if (!geo.results.length) {
+    // 1️⃣ Reverse Geocode → street/area/city/pincode
+    const geoURL = `https://maps.googleapis.com/maps/api/geocode/json?latlng=${lat},${lng}&key=${key}`;
+    const geo = await fetch(geoURL).then((r) => r.json());
+
+    if (!geo.results || geo.results.length === 0) {
       return res.status(400).json({ status: 0, message: "Invalid location" });
     }
 
     const addr = geo.results[0];
+    const comps = addr.address_components;
+
+    const find = (type) =>
+      comps.find((c) => c.types.includes(type))?.long_name || "";
+
+    const street = find("route"); // Market Road
+    const area =
+      find("sublocality_level_1") ||
+      find("sublocality") ||
+      find("locality") ||
+      street;
+
+    const city =
+      find("locality") ||
+      find("administrative_area_level_2") ||
+      "";
+
+    const pincode = find("postal_code") || "";
+
+    // 2️⃣ Places Nearby → building / apartment
+    const placesURL = `https://maps.googleapis.com/maps/api/place/nearbysearch/json?location=${lat},${lng}&radius=50&key=${key}`;
+    const places = await fetch(placesURL).then((r) => r.json());
+
+    const building = places.results?.[0]?.name || "";
 
     return res.json({
       status: 1,
-      address: addr.formatted_address,
+      address: addr.formatted_address, // full human-readable
+      parsed: {
+        building,   // for line1
+        area,       // for line2 (Area / Street)
+        street,     // optional if you want
+        city,
+        pincode,
+      },
     });
   } catch (err) {
-    console.log(err);
+    console.log("GOOGLE API ERROR:", err);
     return res.status(500).json({ status: 0, message: "Internal Error" });
   }
 };
+

@@ -1,5 +1,5 @@
 import express from "express";
-import { authVerify } from "../middleware/authMiddleware.js"
+import { auth} from "../middleware/authMiddleware.js"
 import {
   addAddress,
   editAddress,
@@ -12,14 +12,15 @@ import {
 const router = express.Router();
 
 // Apply security to all routes
-router.use(authVerify);
+router.use(auth);
 
 router.post("/add", addAddress);
 router.put("/edit/:address_id", editAddress);
 router.delete("/delete/:address_id", deleteAddress);
 router.get("/list", listAddresses);
 router.get("/details/:address_id", getAddressDetails);
-router.get("/autofill", autoFillCurrentLocation);
+router.get("/autofill-location", autoFillCurrentLocation);
+
 
 export default router;
 

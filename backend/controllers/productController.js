@@ -15,7 +15,8 @@ export const neweditcategory = async (req, res) => {
   //} API REQUEST PARAMETER
 
   try {
-    const { store_id, category_name, sts, mode, catid } = req.body;
+    const {category_name, sts, mode, catid } = req.body;
+    const store_id =req.user.store_id;
 
     // VALIDATION
     if (!store_id || !category_name) {
@@ -75,7 +76,7 @@ export const createitmfile = async (req, res) => {
       return res.status(400).json({ status: 0, message: "File not uploaded" });
     }
 
-    const { store_id } = req.body;
+    const store_id =req.user.store_id;
 
     // Read Excel buffer
     const workbook = XLSX.read(req.file.buffer, { type: "buffer" });
@@ -156,7 +157,8 @@ export const orderdatas = async (req, res) => {
 // "todate":"2025-11-30"
 // } api request
   try {
-    const { store_id, limit = 20, offset = 0, searchtxt = '' } = req.body;
+    const {  limit = 20, offset = 0, searchtxt = '' } = req.body;
+     const store_id =req.user.store_id;
 
     if (!store_id) {
       return res.status(400).json({
@@ -202,7 +204,8 @@ export const orderdatas = async (req, res) => {
 };
 export const addProduct = async (req, res) => {
   try {
-    const { store_id, products } = req.body;
+    const { products } = req.body;
+     const store_id =req.user.store_id;
 
     if (!store_id) {
       return res.status(400).json({ status: 0, message: "store_id is required" });
@@ -237,7 +240,7 @@ export const addProduct = async (req, res) => {
 
 export const getProductsByCategory = async (req, res) => {
   try {
-    const { store_id } = req.body;
+    const store_id =req.user.store_id;
 
     if (!store_id) {
       return res.status(400).json({ status: 0, message: "store_id required" });

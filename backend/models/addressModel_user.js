@@ -18,14 +18,14 @@ export const AddressModel = {
   addAddress: async (tenantPool, data) => {
     const {
       user_id,
+      store_id,
       address_type,
       name,
       phone,
       pincode,
-      state,
-      district,
       city,
       street,
+      Building,
       landmark,
       lat,
       lng,
@@ -34,23 +34,23 @@ export const AddressModel = {
 
     const res = await tenantPool.query(
       `INSERT INTO tbl_address (
-        user_id, address_type, name, phone,
-        pincode, state, district, city,
-        street, landmark, lat, lng, is_default,
+        user_id,store_id, address_type, name, phone,
+        pincode,  city,
+        street, Building,landmark, lat, lng, is_default,
         created_at
       )
       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,NOW())
       RETURNING address_id`,
       [
         user_id,
+        store_id,
         address_type,
         name,
         phone,
         pincode,
-        state,
-        district,
         city,
         street,
+        Building,
         landmark,
         lat,
         lng,
@@ -65,7 +65,7 @@ export const AddressModel = {
   editAddress: async (tenantPool, address_id, data) => {
     const allowed = [
       "address_type", "name", "phone", "pincode",
-      "state", "district", "city", "street",
+      "state",  "street","Building",
       "landmark", "lat", "lng", "is_default"
     ];
 
@@ -119,3 +119,27 @@ export const AddressModel = {
     return res.rows[0];
   },
 };
+import axios from "axios";
+
+export const API_BASE = "http://192.168.56.1:5000";
+
+const API = axios.create({
+  baseURL: API_BASE,
+});
+
+// Automatically attach JWT from localStorage
+API.interceptors.request.use((config) => {
+  const token = localStorage.getItem("token");
+  if (token) config.headers.Authorization = `Bearer ${token}`;
+  return config;
+});
+
+// Fetch all saved addresses
+export const fetchAddresses = () => API.get("/auser/address/list");
+
+// Delete address
+export const removeAddress = (id) => API.delete(`/auser/address/${id}`);
+
+// Set default address
+export const setDefaultAddress = (id) =>
+  API.post(`/auser/address/set-default/${id}`);

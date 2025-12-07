@@ -1,8 +1,7 @@
-import { CustomerModel } from "../models/customerModel.js";
-
 export const addCustomer = async (req, res) => {
   try {
-    const { store_id, name, phone, email } = req.body;
+    const store_id = req.user.store_id; // from JWT
+    const { name, phone, email } = req.body;
 
     const user_id = await CustomerModel.addCustomer({
       name,
@@ -22,10 +21,9 @@ export const addCustomer = async (req, res) => {
     return res.status(500).json({ status: 0, message: "Internal Error" });
   }
 };
-
 export const listCustomers = async (req, res) => {
   try {
-    const { store_id } = req.query;
+    const store_id = req.user.store_id; // from JWT
 
     const tenantPool = await CustomerModel.getTenantDB(store_id);
 
@@ -37,13 +35,11 @@ export const listCustomers = async (req, res) => {
       let name = c.name;
       let city = null;
 
-      // 🔥 If APP CUSTOMER → fetch name & city from address table
       if (c.added_by === "app") {
         const appInfo = await CustomerModel.getAppCustomerDetailsFromAddress(
           tenantPool,
           c.user_id
         );
-
         if (appInfo) {
           name = appInfo.name || name;
           city = appInfo.city;
@@ -76,11 +72,9 @@ export const listCustomers = async (req, res) => {
     return res.status(500).json({ message: "Internal error" });
   }
 };
-
-
 export const customerDetails = async (req, res) => {
   try {
-    const { store_id } = req.query;
+    const store_id = req.user.store_id; // from JWT
     const { user_id } = req.params;
 
     const tenantPool = await CustomerModel.getTenantDB(store_id);
@@ -90,7 +84,10 @@ export const customerDetails = async (req, res) => {
       user_id
     );
 
-    const address = await CustomerModel.getAppCustomerDetailsFromAddress(tenantPool, user_id);
+    const address = await CustomerModel.getAppCustomerDetailsFromAddress(
+      tenantPool,
+      user_id
+    );
 
     return res.json({
       user_id,
