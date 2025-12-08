@@ -5,8 +5,8 @@ export const auth = (req, res, next) => {
   {
     req.user =
     {
-      register_id:27,
-      user_id :1,
+      register_id:2,
+      user_id :9,
       role :"user",
       
     };

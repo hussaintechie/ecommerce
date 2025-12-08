@@ -6,6 +6,7 @@ import path from "path";
 import customerRoutes from "./routes/customerRoutes.js";
 import addressModel_user from "./routes/addressRouter_user.js"
 import favoriteRoutes_user from "./routes/favoriteRoutes_user.js"
+import profileRoutes_user from "./routes/profileRoutes_user.js"
 
 import dotenv from "dotenv";
 dotenv.config();
@@ -20,6 +21,7 @@ app.use(express.json());
 
 app.use("/auth", authRoutes);
 app.use("/fuser",favoriteRoutes_user)
+app.use("/puser",profileRoutes_user)
 
 app.use("/product",productRouter)
 app.use("/customer",customerRoutes)
