@@ -15,11 +15,11 @@ app.use(cors());
 app.use(express.json());
 
 app.use("/auth", authRoutes);
-app.use("/user",favoriteRoutes_user)
+app.use("/fuser",favoriteRoutes_user)
 
 app.use("/product",productRouter)
 app.use("/customer",customerRoutes)
-app.use("/user",addressModel_user)
+app.use("/auser",addressModel_user)
 app.use('/uploads', express.static('uploads'));
 
 const PORT = 5000;

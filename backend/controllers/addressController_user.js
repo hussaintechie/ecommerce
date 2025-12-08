@@ -2,7 +2,7 @@ import { AddressModel } from "../models/addressModel_user.js";
 
 export const addAddress = async (req, res) => {
   try {
-    const store_id = req.user.store_id;
+    const store_id = req.user.register_id;
     const user_id = req.user.user_id;
 
     const {
@@ -52,7 +52,7 @@ export const addAddress = async (req, res) => {
 
 export const editAddress = async (req, res) => {
   try {
-    const store_id = req.user.store_id;
+    const store_id = req.user.register_id;
     const user_id = req.user.user_id; // used to verify ownership
     const { address_id } = req.params;
 
@@ -76,7 +76,7 @@ export const editAddress = async (req, res) => {
 
 export const deleteAddress = async (req, res) => {
   try {
-    const store_id = req.user.store_id;
+    const store_id = req.user.register_id;
     const user_id = req.user.user_id;
     const { address_id } = req.params;
 
@@ -100,7 +100,7 @@ export const deleteAddress = async (req, res) => {
 
 export const listAddresses = async (req, res) => {
   try {
-    const store_id = req.user.store_id;
+    const store_id = req.user.register_id;
     const user_id = req.user.user_id;
 
     const tenantPool = await AddressModel.getTenantDB(store_id);
@@ -117,7 +117,7 @@ export const listAddresses = async (req, res) => {
 
 export const getAddressDetails = async (req, res) => {
   try {
-    const store_id = req.user.store_id;
+    const store_id = req.user.register_id;
     const user_id = req.user.user_id;
     const { address_id } = req.params;
 

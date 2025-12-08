@@ -194,6 +194,7 @@ export const login = async (req, res) => {
       return res.json({
         status: 1,
         message: "Signup + Login success",
+        user_id :user.user_id,
         role: user.user_role,
         register_id: user.register_id,
       });
@@ -221,6 +222,7 @@ export const login = async (req, res) => {
         status: 1,
         message: "OTP Login success",
         role: user.user_role,
+        user_id :user.user_id,
         register_id: user.register_id,
         tenant_db: user.tenant_db || null,
       });
@@ -249,6 +251,7 @@ export const login = async (req, res) => {
           status: 1,
           message: "Password created + Login success",
           role: user.user_role,
+          user_id :user.user_id,
           register_id: user.register_id,
           tenant_db: user.tenant_db || null,
         });
@@ -270,6 +273,7 @@ export const login = async (req, res) => {
         status: 1,
         message: "Password Login success",
         role: user.user_role,
+        user_id :user.user_id,
         register_id: user.register_id,
         tenant_db: user.tenant_db || null,
       });
