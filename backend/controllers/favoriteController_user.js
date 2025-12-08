@@ -2,7 +2,9 @@ import { FavoriteModel } from "../models/favoriteModel_user.js";
 
 export const toggleFavorite = async (req, res) => {
   try {
-    const { user_id, product_id, store_id } = req.body;
+    const { product_id } = req.body;
+    const user_id = req.user.user_id;
+    const store_id = req.user.register_id;
 
     if (!user_id || !product_id || !store_id) {
       return res.status(400).json({ message: "Missing fields" });
@@ -33,8 +35,8 @@ export const toggleFavorite = async (req, res) => {
 };
 export const getFavorites = async (req, res) => {
   try {
-    const user_id = req.params.user_id;   // <-- URL PARAM
-    const store_id = req.query.store_id;  // <-- QUERY PARAM
+    const user_id = req.user.user_id;
+    const store_id = req.user.register_id;
 
     if (!user_id || !store_id) {
       return res.status(400).json({

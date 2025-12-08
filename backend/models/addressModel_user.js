@@ -18,42 +18,47 @@ export const AddressModel = {
   addAddress: async (tenantPool, data) => {
     const {
       user_id,
+      store_id,
       address_type,
       name,
       phone,
       pincode,
-      state,
-      district,
       city,
       street,
+      Building,
       landmark,
       lat,
       lng,
       is_default,
+      full_address,
+
     } = data;
 
     const res = await tenantPool.query(
       `INSERT INTO tbl_address (
-        user_id, address_type, name, phone,
-        pincode, state, district, city,
-        street, landmark, lat, lng, is_default,
+        user_id,store_id, address_type, name, phone,
+        pincode,  city,
+        street, Building,landmark, lat, lng, full_address,
+is_default,
         created_at
       )
-      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,NOW())
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,NOW())
       RETURNING address_id`,
       [
         user_id,
+        store_id,
         address_type,
         name,
         phone,
         pincode,
-        state,
-        district,
         city,
         street,
+        Building,
         landmark,
         lat,
         lng,
+        full_address,
+
         is_default,
       ]
     );
@@ -65,8 +70,9 @@ export const AddressModel = {
   editAddress: async (tenantPool, address_id, data) => {
     const allowed = [
       "address_type", "name", "phone", "pincode",
-      "state", "district", "city", "street",
-      "landmark", "lat", "lng", "is_default"
+      "state",  "street","Building",
+      "landmark", "lat", "lng","full_address",
+ "is_default"
     ];
 
     const fields = [];

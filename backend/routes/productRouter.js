@@ -1,9 +1,9 @@
 import express  from "express"
 import multer from "multer"
 import {neweditcategory ,createitmfile ,orderdatas,addProduct,getProductsByCategory} from "../controllers/productController.js"
-
+import {auth} from "../middleware/authMiddleware.js";
 const router =express.Router()
-
+router.use(auth);
 router.post("/neweditcategory",neweditcategory);
 
 const storage = multer.memoryStorage();

@@ -35,11 +35,22 @@ export const FavoriteModel = {
     return result.rows;
   },
   listFavorites: async (tenantPool, user_id) => {
-    const result = await tenantPool.query(`
-      SELECT  f.fav_id,p.* from tbl_favorites f
-      JOIN tbl_master_product P ON f.product_id=p.product_id
-      WHERE f.user_id= $1
-      `,[user_id]);
-      return result.rows
-  },
+  const result = await tenantPool.query(`
+    SELECT 
+      f.fav_id,
+      f.product_id AS fav_product_id,
+      p.product_id,
+      p.title,
+      p.price,
+      p.unit,
+      p.thumbnail
+    FROM tbl_favorites f
+    JOIN tbl_master_product p
+      ON f.product_id = p.product_id
+    WHERE f.user_id = $1
+  `, [user_id]);
+
+  return result.rows;
+},
+
 };
