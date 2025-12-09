@@ -2,67 +2,63 @@ import pool from "../config/masterDB.js";
 import { getTenantPool } from "../config/tenantDB.js";
 import fs from "fs";
 import path from "path";
-import nodemailer from "nodemailer";
+import axios from "axios";
+import { generateToken } from "../helpers/jwt.js";
 
+// ==========================================
+// ADMIN REGISTRATION (Production Ready)
+// ==========================================
 export const adminRegister = async (req, res) => {
   try {
     const { phone, store_name, email_id } = req.body;
 
-    if (!phone || !store_name || !email_id)
-      return res.status(400).json({ message: "All fields required" });
+    if (!phone || !store_name)
+      return res.status(400).json({ message: "Phone & store name required" });
 
     // Check admin exists
     const exists = await pool.query(
-      "SELECT * FROM tbl_register WHERE phone=$1 AND email_id=$2",
-      [phone, email_id]
+      "SELECT * FROM tbl_register WHERE phone=$1",
+      [phone]
     );
 
     if (exists.rows.length > 0)
       return res.status(400).json({ message: "Admin already exists" });
 
-    // Insert new admin
+    // Insert admin
     const reg = await pool.query(
       `INSERT INTO tbl_register (phone, store_name, email_id)
        VALUES ($1,$2,$3) RETURNING register_id`,
-      [phone, store_name, email_id]
+      [phone, store_name, email_id || null]
     );
 
     const register_id = reg.rows[0].register_id;
 
-    // Create login
+    // Create login row
     await pool.query(
-      `INSERT INTO tbl_login (email, register_id, user_role)
-       VALUES ($1,$2,'admin')`,
-      [email_id, register_id]
+      `INSERT INTO tbl_login (phone, user_role, register_id) VALUES ($1,$2,$3)`,
+      [phone, "admin", register_id]
     );
 
-    // TENANT DB NAME
-    const dbName = store_name.toLowerCase().replace(/\s+/g, "_");
-
     // Create tenant DB
+    const dbName = store_name.toLowerCase().replace(/\s+/g, "_");
     await pool.query(`CREATE DATABASE ${dbName}`);
 
-    // Save tenant mapping
-   await pool.query(
-  `INSERT INTO tbl_tenant_databases (register_id, db_name, db_user, db_pass, port)
-   VALUES ($1, $2, $3, $4, $5)`,
-  [
-    register_id,
-    dbName,
-    process.env.DB_USER,   // postgres
-    process.env.DB_PASS,   // root
-    process.env.DB_PORT    // 5433
-  ]
-);
+    // Save mapping
+    await pool.query(
+      `INSERT INTO tbl_tenant_databases (register_id, db_name, db_user, db_pass, port)
+       VALUES ($1,$2,$3,$4,$5)`,
+      [
+        register_id,
+        dbName,
+        process.env.DB_USER,
+        process.env.DB_PASS,
+        process.env.DB_PORT,
+      ]
+    );
 
-
-    // Load tenant DB connection
+    // Run schema
     const tenantPool = getTenantPool(dbName);
-
-    // Run tenant schema
-    const schemaPath = path.join("tenant", "tenantSchema.sql");
-    const schema = fs.readFileSync(schemaPath).toString();
-
+    const schema = fs.readFileSync(path.join("tenant", "tenantSchema.sql")).toString();
     await tenantPool.query(schema);
 
     res.json({
@@ -71,265 +67,112 @@ export const adminRegister = async (req, res) => {
       register_id,
       dbName,
     });
+
   } catch (err) {
     console.error("Admin Register Error:", err);
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ message: "Registration failed" });
   }
 };
 
+// ==========================================
+// LOGIN WITH PHONE + OTP
+// ==========================================
+
+// Generate OTP
 const generateOTP = () => Math.floor(100000 + Math.random() * 900000);
 
-// ====================================
-// LOGIN (OTP + PASSWORD + AUTO SIGNUP)
-// ====================================
+// SEND SMS (same)
+const sendSMS = async (phone, otp) => {
+  if (process.env.NODE_ENV !== "production") {
+    console.log(`DEV MODE OTP for ${phone} →`, otp);
+    return true;
+  }
+
+  const url = "https://www.fast2sms.com/dev/bulkV2";
+
+  await axios.post(url, {
+      route: "v3",
+      sender_id: "TXTIND",
+      message: `Your OTP is ${otp}`,
+      language: "english",
+      numbers: phone
+    },
+    { headers: { authorization: process.env.FAST2SMS_API_KEY } }
+  );
+
+  return true;
+};
+
+// LOGIN CONTROLLER (WITH JWT)
 export const login = async (req, res) => {
   try {
-    const { email, otp, password, sendOtp } = req.body;
+    const { phone, otp, sendOtp } = req.body;
 
-    if (!email) return res.status(400).json({ message: "Email required" });
+    if (!phone) return res.status(400).json({ message: "Phone required" });
 
-    // ===============================
-    // STEP 1: SEND OTP
-    // ===============================
+    // Step 1 → Send OTP
     if (sendOtp) {
       const newOtp = generateOTP();
 
       const userCheck = await pool.query(
-        "SELECT * FROM tbl_login WHERE email=$1",
-        [email]
+        "SELECT * FROM tbl_login WHERE phone=$1",
+        [phone]
       );
 
       if (userCheck.rows.length === 0) {
-        // Check if admin exists
-        const adminCheck = await pool.query(
-          "SELECT * FROM tbl_register WHERE email_id=$1",
-          [email]
-        );
-
-        let role = "user";
-        let registerId = null;
-
-        if (adminCheck.rows.length > 0) {
-          role = "admin";
-          registerId = adminCheck.rows[0].register_id;
-        }
+        const store = await pool.query(`SELECT register_id FROM tbl_register LIMIT 1`);
 
         await pool.query(
-          `INSERT INTO tbl_login (email, user_role, register_id, otp)
+          `INSERT INTO tbl_login (phone, otp, user_role, register_id)
            VALUES ($1,$2,$3,$4)`,
-          [email, role, registerId, newOtp]
+          [phone, newOtp, "user", store.rows[0].register_id]
         );
       } else {
-        await pool.query(`UPDATE tbl_login SET otp=$1 WHERE email=$2`, [
-          newOtp,
-          email,
-        ]);
+        await pool.query("UPDATE tbl_login SET otp=$1 WHERE phone=$2", [newOtp, phone]);
       }
 
-      // Send OTP Mail
-      const transporter = nodemailer.createTransport({
-        service: "gmail",
-        auth: { user: process.env.MAIL_USER, pass: process.env.MAIL_PASS },
-      });
-
-      await transporter.sendMail({
-        to: email,
-        subject: "Your Login OTP",
-        text: `Your OTP is ${newOtp}`,
-      });
+      await sendSMS(phone, newOtp);
 
       return res.json({ status: 1, message: "OTP sent" });
     }
 
-    // ===============================
-    // STEP 2: NORMAL LOGIN (OTP/PASSWORD)
-    // ===============================
-    const userCheck = await pool.query(
-      "SELECT * FROM tbl_login WHERE email=$1",
-      [email]
+    // Step 2 → Verify OTP
+    if (!otp) return res.status(400).json({ message: "OTP required" });
+
+    const result = await pool.query(
+      "SELECT * FROM tbl_login WHERE phone=$1 AND otp=$2",
+      [phone, otp]
     );
 
-    let user = userCheck.rows[0];
+    if (result.rows.length === 0)
+      return res.status(400).json({ message: "Incorrect OTP" });
 
-    // ----------------------------------
-    // AUTO SIGNUP FOR NEW USER
-    // ----------------------------------
-    if (!user) {
-      let role = "user";
-      let registerId = null;
+    const user = result.rows[0];
 
-      const adminCheck = await pool.query(
-        "SELECT * FROM tbl_register WHERE email_id=$1",
-        [email]
+    // Clear OTP
+    await pool.query("UPDATE tbl_login SET otp=NULL WHERE phone=$1", [phone]);
+
+    // Admin → Attach DB
+    if (user.user_role === "admin") {
+      const tenant = await pool.query(
+        "SELECT db_name FROM tbl_tenant_databases WHERE register_id=$1",
+        [user.register_id]
       );
-
-      if (adminCheck.rows.length > 0) {
-        role = "admin";
-        registerId = adminCheck.rows[0].register_id;
-      }
-
-      const insert = await pool.query(
-        `INSERT INTO tbl_login (email, password, otp, user_role, register_id)
-         VALUES ($1,$2,$3,$4,$5) RETURNING *`,
-        [email, password || null, otp || null, role, registerId]
-      );
-
-      user = insert.rows[0];
-
-      return res.json({
-        status: 1,
-        message: "Signup + Login success",
-        role: user.user_role,
-        register_id: user.register_id,
-      });
+      user.tenant_db = tenant.rows[0]?.db_name;
     }
 
-    // -------------------------------
-    // OTP LOGIN
-    // -------------------------------
-    if (otp) {
-      if (user.otp !== otp)
-        return res.status(400).json({ message: "Invalid OTP" });
+    // 🎉 GENERATE JWT TOKEN HERE
+    const token = generateToken(user);
 
-      await pool.query("UPDATE tbl_login SET otp=NULL WHERE email=$1", [email]);
+    return res.json({
+      status: 1,
+      message: "Login success",
+      token,
+      user
+    });
 
-      // Attach tenant DB if admin
-      if (user.user_role === "admin") {
-        const tenant = await pool.query(
-          "SELECT db_name FROM tbl_tenant_databases WHERE register_id=$1",
-          [user.register_id]
-        );
-
-        user.tenant_db = tenant.rows[0].db_name;
-      }
-
-      return res.json({
-        status: 1,
-        message: "OTP Login success",
-        role: user.user_role,
-        register_id: user.register_id,
-        tenant_db: user.tenant_db || null,
-      });
-    }
-
-    // -------------------------------
-    // PASSWORD LOGIN
-    // -------------------------------
-    if (password) {
-      // FIRST TIME CREATE PASSWORD
-      if (!user.password) {
-        await pool.query(`UPDATE tbl_login SET password=$1 WHERE email=$2`, [
-          password,
-          email,
-        ]);
-
-        // Attach tenant DB
-        if (user.user_role === "admin") {
-          const tenant = await pool.query(
-            "SELECT db_name FROM tbl_tenant_databases WHERE register_id=$1",
-            [user.register_id]
-          );
-
-          user.tenant_db = tenant.rows[0].db_name;
-        }
-
-        return res.json({
-          status: 1,
-          message: "Password created + Login success",
-          role: user.user_role,
-          register_id: user.register_id,
-          tenant_db: user.tenant_db || null,
-        });
-      }
-
-      // CHECK PASSWORD
-      if (user.password !== password)
-        return res.status(400).json({ message: "Incorrect password" });
-
-      // Attach tenant DB
-      if (user.user_role === "admin") {
-        const tenant = await pool.query(
-          "SELECT db_name FROM tbl_tenant_databases WHERE register_id=$1",
-          [user.register_id]
-        );
-
-        user.tenant_db = tenant.rows[0].db_name;
-      }
-
-      return res.json({
-        status: 1,
-        message: "Password Login success",
-        role: user.user_role,
-        register_id: user.register_id,
-        tenant_db: user.tenant_db || null,
-      });
-    }
   } catch (err) {
     console.error("Login Error:", err);
     return res.status(500).json({ message: "Login failed" });
-  }
-};
-export const forgotPassword = async (req, res) => {
-  try {
-    const { email } = req.body;
-
-    if (!email) return res.status(400).json({ message: "Email required" });
-
-    const userCheck = await pool.query(
-      "SELECT * FROM tbl_login WHERE email=$1",
-      [email]
-    );
-
-    if (userCheck.rows.length === 0)
-      return res.status(400).json({ message: "Account not found" });
-
-    const otp = generateOTP();
-
-    await pool.query("UPDATE tbl_login SET otp=$1 WHERE email=$2", [
-      otp,
-      email,
-    ]);
-
-    const transporter = nodemailer.createTransport({
-      service: "gmail",
-      auth: { user: process.env.MAIL_USER, pass: process.env.MAIL_PASS },
-    });
-
-    await transporter.sendMail({
-      to: email,
-      subject: "Reset Password OTP",
-      text: `Your OTP is ${otp}`,
-    });
-
-    res.json({ status: 1, message: "OTP sent to your email" });
-  } catch (err) {
-    console.error("Forgot Password Error:", err);
-    res.status(500).json({ message: "OTP sending failed" });
-  }
-};
-export const resetPassword = async (req, res) => {
-  try {
-    const { email, otp, newPassword } = req.body;
-
-    if (!email || !otp || !newPassword)
-      return res.status(400).json({ message: "All fields required" });
-
-    const check = await pool.query(
-      "SELECT * FROM tbl_login WHERE email=$1 AND otp=$2",
-      [email, otp]
-    );
-
-    if (check.rows.length === 0)
-      return res.status(400).json({ message: "Invalid OTP" });
-
-    await pool.query(
-      "UPDATE tbl_login SET password=$1, otp=NULL WHERE email=$2",
-      [newPassword, email]
-    );
-
-    res.json({ status: 1, message: "Password reset successful" });
-  } catch (err) {
-    console.error("Reset Error:", err);
-    res.status(500).json({ message: "Reset failed" });
   }
 };

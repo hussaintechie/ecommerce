@@ -1,8 +1,11 @@
 import express  from "express"
 import multer from "multer"
-import {addCategoryProduct ,neweditcategory ,createitmfile ,orderdatas ,submitorder ,allcatedetails ,catitems ,getuserorders,singleorddetail} from "../controllers/productController.js"
+import {addCategoryProduct ,neweditcategory ,createitmfile ,orderdatas ,submitorder ,allcatedetails ,catitems ,getuserorders,singleorddetail} from "../controllers/productController.js";
+import {auth} from "../middleware/authMiddleware.js"
 
 const router =express.Router()
+router.use(auth);
+router.post("/neweditcategory",neweditcategory);
 
 router.post("/addCategoryProduct",addCategoryProduct);
 router.post("/neweditcategory",neweditcategory);

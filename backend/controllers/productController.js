@@ -16,10 +16,10 @@ export const addCategoryProduct = async (req, res) => {
       thumbnail,
       images
     } = req.body;
-    const store_id=req.user.store_id
+    const register_id=req.user.register_id
 
     if (
-      !store_id ||
+      !register_id ||
       !category_name ||
       !title ||
       !price ||
@@ -35,7 +35,7 @@ export const addCategoryProduct = async (req, res) => {
     // 1. GET TENANT DB NAME USING REGISTER_ID
     const result = await pool.query(
       "SELECT db_name FROM tbl_tenant_databases WHERE register_id=$1",
-      [store_id]
+      [register_id]
     );
 
     if (result.rows.length === 0)
@@ -92,7 +92,7 @@ export const neweditcategory = async (req, res) => {
 
   //  {
   //     "category_name":"FOOD Items76",
-  //     "store_id" : 1,
+  //     "register_id" : 1,
   //     "sts" : 1,
   //     "mode" :1,
   //     "catid" : 1
@@ -100,10 +100,10 @@ export const neweditcategory = async (req, res) => {
 
   try {
     const {  category_name, sts, mode, catid } = req.body;
-    const store_id=req.user.store_id
+    const register_id=req.user.register_id
 
     // VALIDATION
-    if (!store_id || !category_name) {
+    if (!register_id || !category_name) {
       return res.status(400).json({
         status: 0,
         message: "Store ID and Category Name required",
@@ -124,7 +124,7 @@ export const neweditcategory = async (req, res) => {
       FROM tbl_tenant_databases 
       WHERE register_id = $1
     `;
-    const result = await pool.query(tenantQuery, [store_id]);
+    const result = await pool.query(tenantQuery, [register_id]);
 
     if (result.rows.length === 0) {
       return res.status(400).json({ status: 0, message: "Store not found" });
@@ -152,7 +152,7 @@ export const neweditcategory = async (req, res) => {
 
 export const createitmfile = async (req, res) => {
   //file=excel file
-  //store_id =2  request api
+  //register_id =2  request api
 
 
   try {
@@ -160,7 +160,7 @@ export const createitmfile = async (req, res) => {
       return res.status(400).json({ status: 0, message: "File not uploaded" });
     }
 
-    const store_id=req.user.store_id
+    const register_id=req.user.register_id
 
     // Read Excel buffer
     const workbook = XLSX.read(req.file.buffer, { type: "buffer" });
@@ -176,7 +176,7 @@ export const createitmfile = async (req, res) => {
       FROM tbl_tenant_databases 
       WHERE register_id = $1
     `;
-    const result = await pool.query(tenantQuery, [store_id]);
+    const result = await pool.query(tenantQuery, [register_id]);
 
     if (result.rows.length === 0) {
       return res.status(400).json({ status: 0, message: "Store not found" });
@@ -233,7 +233,7 @@ export const createitmfile = async (req, res) => {
 export const orderdatas = async (req, res) => {
 
 //   {
-// "store_id" :1,
+// "register_id" :1,
 // "limit" :20,
 // "offset" :0,
 // "searchtxt":"hai",
@@ -242,9 +242,9 @@ export const orderdatas = async (req, res) => {
 // } api request
   try {
     const {  limit = 20, offset = 0, searchtxt = '' } = req.body;
-    const store_id=req.user.store_id
+    const register_id=req.user.register_id
 
-    if (!store_id) {
+    if (!register_id) {
       return res.status(400).json({
         status: 0,
         message: "Store ID required",
@@ -258,7 +258,7 @@ export const orderdatas = async (req, res) => {
       WHERE register_id = $1
     `;
 
-    const result = await pool.query(tenantQuery, [store_id]);
+    const result = await pool.query(tenantQuery, [register_id]);
 
     if (result.rows.length === 0) {
       return res.status(400).json({ status: 0, message: "Store not found" });
@@ -269,7 +269,7 @@ export const orderdatas = async (req, res) => {
     // Call model function
     const orderdatares = await productmodel.orderdataget(
       tenantDB,
-      store_id,
+      register_id,
       limit,
       offset,
       searchtxt
@@ -292,7 +292,7 @@ export const orderdatas = async (req, res) => {
 export const submitorder = async (req, res) => {
 
 // {
-//   "store_id": 1,
+//   "register_id": 1,
 //   "product_id": 12,
 //   "user_id": 3,
 //   "address_delivery": "72/1 ,siruvadi",
@@ -326,10 +326,10 @@ export const submitorder = async (req, res) => {
 
   try {
     const {address_delivery ,total_amount ,order_status ,delivery_id ,payment_status ,items_details} = req.body;
-    const store_id=req.user.store_id
+    const register_id=req.user.register_id
     const user_id=req.user.user_id
 
-    if (!store_id) {
+    if (!register_id) {
       return res.status(400).json({
         status: 0,
         message: "Store ID required",
@@ -349,7 +349,7 @@ export const submitorder = async (req, res) => {
       WHERE register_id = $1
     `;
 
-    const result = await pool.query(tenantQuery, [store_id]);
+    const result = await pool.query(tenantQuery, [register_id]);
 
     if (result.rows.length === 0) {
       return res.status(400).json({ status: 0, message: "Store not found" });
@@ -358,7 +358,7 @@ export const submitorder = async (req, res) => {
     const tenantDB = getTenantPool(result.rows[0].db_name);
 
     // Call model function
-    const orderdatares = await productmodel.ordersubmit(tenantDB,store_id,user_id ,address_delivery ,total_amount ,order_status ,delivery_id ,payment_status,items_details);
+    const orderdatares = await productmodel.ordersubmit(tenantDB,register_id,user_id ,address_delivery ,total_amount ,order_status ,delivery_id ,payment_status,items_details);
 
     return res.status(200).json(orderdatares);
 
@@ -376,16 +376,16 @@ export const submitorder = async (req, res) => {
 export const allcatedetails = async (req, res) => {
 
 // {
-//   "store_id": 1,
+//   "register_id": 1,
 //   "mode_fetchorall": 0,
 //   "cate_id": 0
 // }
 
   try {
     const { mode_fetchorall, cate_id} = req.body;
-    const store_id=req.user.store_id
+    const register_id=req.user.register_id
 
-    if (!store_id) {
+    if (!register_id) {
       return res.status(400).json({
         status: 0,
         message: "Store ID required",
@@ -400,7 +400,7 @@ export const allcatedetails = async (req, res) => {
       WHERE register_id = $1
     `;
 
-    const result = await pool.query(tenantQuery, [store_id]);
+    const result = await pool.query(tenantQuery, [register_id]);
 
     if (result.rows.length === 0) {
       return res.status(400).json({ status: 0, message: "Store not found" });
@@ -409,7 +409,7 @@ export const allcatedetails = async (req, res) => {
     const tenantDB = getTenantPool(result.rows[0].db_name);
 
     // Call model function
-    const catedatares = await productmodel.allcatedetails(tenantDB,store_id,mode_fetchorall ,cate_id);
+    const catedatares = await productmodel.allcatedetails(tenantDB,register_id,mode_fetchorall ,cate_id);
 
     return res.status(200).json(catedatares);
 
@@ -425,15 +425,15 @@ export const allcatedetails = async (req, res) => {
 export const catitems = async (req, res) => {
 
 // {
-//   "store_id": 1,
+//   "register_id": 1,
 //   "cate_id": 0
 // }
 
   try {
     const {cate_id} = req.body;
-    const store_id=req.user.store_id
+    const register_id=req.user.register_id
 
-    if (!store_id) {
+    if (!register_id) {
       return res.status(400).json({
         status: 0,
         message: "Store ID required",
@@ -448,7 +448,7 @@ export const catitems = async (req, res) => {
       WHERE register_id = $1
     `;
 
-    const result = await pool.query(tenantQuery, [store_id]);
+    const result = await pool.query(tenantQuery, [register_id]);
 
     if (result.rows.length === 0) {
       return res.status(400).json({ status: 0, message: "Store not found" });
@@ -457,7 +457,7 @@ export const catitems = async (req, res) => {
     const tenantDB = getTenantPool(result.rows[0].db_name);
 
     // Call model function
-    const catedatares = await productmodel.catitems(tenantDB,store_id ,cate_id);
+    const catedatares = await productmodel.catitems(tenantDB,register_id ,cate_id);
 
     return res.status(200).json(catedatares);
 
@@ -473,14 +473,14 @@ export const catitems = async (req, res) => {
 export const getuserorders = async (req, res) => {
 
 // {
-//   "store_id": 1,
+//   "register_id": 1,
 //   "userid": 3
 // }
   try {
     const  userid = req.user.user_id;
-    const store_id=req.user.store_id
+    const register_id=req.user.register_id
 
-    if (!store_id) {
+    if (!register_id) {
       return res.status(400).json({
         status: 0,
         message: "Store ID required",
@@ -501,7 +501,7 @@ export const getuserorders = async (req, res) => {
       WHERE register_id = $1
     `;
 
-    const result = await pool.query(tenantQuery, [store_id]);
+    const result = await pool.query(tenantQuery, [register_id]);
 
     if (result.rows.length === 0) {
       return res.status(400).json({ status: 0, message: "Store not found" });
@@ -510,7 +510,7 @@ export const getuserorders = async (req, res) => {
     const tenantDB = getTenantPool(result.rows[0].db_name);
 
     // Call model function
-    const userorderres = await productmodel.getuserorders(tenantDB,store_id ,userid);
+    const userorderres = await productmodel.getuserorders(tenantDB,register_id ,userid);
 
     return res.status(200).json(userorderres);
 
@@ -525,13 +525,13 @@ export const getuserorders = async (req, res) => {
 };
 export const singleorddetail = async (req, res) => {
 // {
-//   "store_id": 1,
+//   "register_id": 1,
 //   "orderid": 3
 // }
   try {
     const {orderid} = req.body;
-   const store_id=req.user.store_id
-    if (!store_id) {
+   const register_id=req.user.register_id
+    if (!register_id) {
       return res.status(400).json({
         status: 0,
         message: "Store ID required",
@@ -552,7 +552,7 @@ export const singleorddetail = async (req, res) => {
       WHERE register_id = $1
     `;
 
-    const result = await pool.query(tenantQuery, [store_id]);
+    const result = await pool.query(tenantQuery, [register_id]);
 
     if (result.rows.length === 0) {
       return res.status(400).json({ status: 0, message: "Store not found" });
@@ -561,7 +561,7 @@ export const singleorddetail = async (req, res) => {
     const tenantDB = getTenantPool(result.rows[0].db_name);
 
     // Call model function
-    const userorderres = await productmodel.singleorddetail(tenantDB,store_id ,orderid);
+    const userorderres = await productmodel.singleorddetail(tenantDB,register_id ,orderid);
 
     return res.status(200).json(userorderres);
 

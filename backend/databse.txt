@@ -7,12 +7,13 @@ CREATE TABLE tbl_register (
 );
 CREATE TABLE tbl_login (
     user_id SERIAL PRIMARY KEY,
-    register_id INT NOT NULL,
+    register_id INT ,
     email VARCHAR(255) UNIQUE NOT NULL,
     password VARCHAR(255),
     otp VARCHAR(6),
     user_role VARCHAR(10) CHECK (user_role IN ('admin','user')) NOT NULL DEFAULT 'user',
     is_first_login BOOLEAN DEFAULT TRUE,
+    
     created_at TIMESTAMP DEFAULT NOW(),
 
     CONSTRAINT fk_login_register FOREIGN KEY (register_id)
@@ -30,3 +31,24 @@ CREATE TABLE tbl_tenant_databases (
     port int,
     created_at TIMESTAMP DEFAULT NOW()
 );
+
+
+
+
+
+
+---------alter----------------
+-------table--------tbl_login------
+alter table tbl_login 
+add column added_by VARCHAR(26) DEFAULT user
+
+alter table tbl_login 
+add column name VARCHAR(26) 
+alter table tbl_login 
+add column phone VARCHAR(26) 
+
+--------------------------------------------------------
+-------------tbl_register-------------------------
+alter table tbl_address
+add column phone varchar (26)
+
