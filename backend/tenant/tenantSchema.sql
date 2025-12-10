@@ -152,29 +152,6 @@ CREATE TABLE IF NOT EXISTS tbl_product_images (
     created_at TIMESTAMP DEFAULT NOW()
 );
 
-<<<<<<< HEAD
-CREATE TABLE IF NOT EXISTS tbl_rollno_master (
-    rollid SERIAL PRIMARY KEY,
-    prefix VARCHAR(50) NOT NULL,
-    lastrollid INT,
-    nodigit INT 
-);
-
-create table IF NOT EXISTS tbl_master_order_items (
-    ord_trnid SERIAL PRIMARY KEY,
-	order_id INT NOT NULL,
-    product_id INT NOT NULL,
-	product_name VARCHAR(255),
-    product_unit INT NOT NULL,
-    product_qty INT NOT NULL,
-    product_rate NUMERIC(10,2) NOT NULL,
-    product_amount NUMERIC(10,2) NOT NULL,
-    discount_amt NUMERIC(10,2) NOT NULL,
-    discount_per NUMERIC(10,2) NOT NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-insert into tbl_rollno_master(prefix ,lastrollid,nodigit) values ('ORD' ,1 ,4);
-=======
 create table tbl_favorites (
 fav_id serial primary key,
 user_id int not null,
@@ -183,4 +160,3 @@ created_at timestamp default now(),
 unique(user_id,product_id)
 
 )
->>>>>>> 02e3c1a9004ed324ac8ed4f3119de893522622ec
