@@ -10,3 +10,4 @@ router.get("/", getFavorites);
 router.post("/toggle", toggleFavorite);
 
 export default router;
+

@@ -1,7 +1,7 @@
 import pool from "../config/masterDB.js";
 import XLSX from "xlsx";
 import { getTenantPool } from "../config/tenantDB.js";
-import productmodel from "../model/productmodel.js";
+import productmodel from "../models/productModel.js"
 
 export const addCategoryProduct = async (req, res) => {
   try {

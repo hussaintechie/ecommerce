@@ -112,6 +112,30 @@ CREATE TABLE IF NOT EXISTS tbl_master_payment (
       FOREIGN KEY (order_id) REFERENCES tbl_master_orders(order_id)
       ON DELETE CASCADE
 );
+CREATE TABLE tbl_cart (
+    cart_id SERIAL PRIMARY KEY,
+    user_id INT NOT NULL,        -- master DB user
+    product_id INT NOT NULL,     -- optional FK
+    quantity INT DEFAULT 1,
+    status VARCHAR(20) DEFAULT 'active',
+    created_at TIMESTAMP DEFAULT NOW(),
+    updated_at TIMESTAMP DEFAULT NOW()
+);          
+
+CREATE OR REPLACE FUNCTION update_timestamp()
+RETURNS TRIGGER AS $$
+BEGIN
+   NEW.updated_at = NOW();
+   RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER set_timestamp
+BEFORE UPDATE ON tbl_cart
+FOR EACH ROW
+EXECUTE PROCEDURE update_timestamp();
+
+
 CREATE TABLE IF NOT EXISTS tbl_delivery_modes (
     delivery_id SERIAL PRIMARY KEY,
     delivery_mode VARCHAR(50) NOT NULL

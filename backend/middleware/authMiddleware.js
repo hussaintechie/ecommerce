@@ -1,16 +1,13 @@
 import jwt from "jsonwebtoken";
 
 export const auth = (req, res, next) => {
-  if(process.env.DEV_MODE === "true")
-  {
-    req.user =
-    {
-      register_id:27,
-      user_id :1,
-      role :"user",
-      
+  if (process.env.DEV_MODE === "true") {
+    req.user = {
+      register_id: 27,
+      user_id: 1,
+      role: "user",
     };
-    return next()
+    return next();
   }
   // try {
   //   const header = req.headers.authorization;
