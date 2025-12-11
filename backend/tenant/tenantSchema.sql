@@ -16,10 +16,7 @@ CREATE TABLE tbl_address (
 
     lat             DECIMAL(10,6),
     lng             DECIMAL(10,6),
-<<<<<<< HEAD
-=======
     is_default BOOLEAN DEFAULT false,
->>>>>>> 02e3c1a9004ed324ac8ed4f3119de893522622ec
 
     created_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
@@ -64,35 +61,10 @@ CREATE TABLE IF NOT EXISTS tmp_tbl_master_product (
     quantity INT,
     unit VARCHAR(50)
 );
-<<<<<<< HEAD
--- CREATE TABLE IF NOT EXISTS tbl_master_orders (
---     order_id SERIAL PRIMARY KEY,
---     order_no VARCHAR(20) DEFAULT '',
---     product_id INT NOT NULL,
---     product_qty INT NOT NULL,
---     product_rate NUMERIC(10,2) NOT NULL,
---     user_id INT NOT NULL,
---     address_delivery TEXT,
---     total_amount NUMERIC(10,2) NOT NULL,
---     order_status VARCHAR(20) DEFAULT 'new',
---     delivery_id INT,
---     payment_status VARCHAR(10) DEFAULT 'pending',
---     delivery_chg NUMERIC(10,2) NOT NULL,
---     discount_amt NUMERIC(10,2) NOT NULL,
---     discount_per NUMERIC(10,2) NOT NULL,
---     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
--- );
-
-
-CREATE TABLE IF NOT EXISTS tbl_master_orders (
-    order_id SERIAL PRIMARY KEY,
-    order_no VARCHAR(20) DEFAULT '',
-=======
 CREATE TABLE IF NOT EXISTS tbl_master_orders (
     order_id SERIAL PRIMARY KEY,
     order_no VARCHAR(20) DEFAULT '',
     product_id INT NOT NULL,
->>>>>>> 02e3c1a9004ed324ac8ed4f3119de893522622ec
     user_id INT NOT NULL,
     address_delivery TEXT,
     total_amount NUMERIC(10,2) NOT NULL,
@@ -160,3 +132,10 @@ created_at timestamp default now(),
 unique(user_id,product_id)
 
 )
+CREATE TABLE IF NOT EXISTS tbl_rollno_master (
+    rollid SERIAL PRIMARY KEY,
+    prefix VARCHAR(50) NOT NULL,
+    lastrollid INT,
+    nodigit INT 
+);
+insert into tbl_rollno_master(prefix ,lastrollid,nodigit) values ('ORD' ,1 ,4);

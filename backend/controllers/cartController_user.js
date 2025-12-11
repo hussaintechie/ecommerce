@@ -166,27 +166,40 @@ export const getDeliverySlots = async (req, res) => {
         minute: "2-digit",
       });
 
-    // -------------------------
-    // 1️⃣ Generate TODAY slots
-    // -------------------------
-    let hour = now.getHours() + 1; // next available hour
 
-    for (let i = 0; i < 6; i++) {
-      let start = new Date();
-      start.setHours(hour + i, 30, 0);
 
-      let end = new Date();
-      end.setHours(hour + i + 1, 30, 0);
+const nowHour = now.getHours();
+const nowMin = now.getMinutes();
 
-      // end after 10:30 PM max
-      if (start.getHours() >= 22) break;
+// Start time = next available 30-min block
+let start = new Date();
+if (nowMin <= 30) {
+  start.setHours(nowHour, 30, 0);
+} else {
+  start.setHours(nowHour + 1, 0, 0);
+}
 
-      todaySlots.push({
-        label: `Today, ${formatTime(start)} - ${formatTime(end)}`,
-        start,
-        end,
-      });
-    }
+// Last allowed end time = 8:30 PM
+const lastSlotEnd = new Date();
+lastSlotEnd.setHours(20, 30, 0);
+
+// Loop until end time exceeds 8:30 PM
+while (start < lastSlotEnd) {
+  const end = new Date(start);
+  end.setHours(start.getHours() + 1);
+
+  // stop if end time goes beyond 8:30 PM
+  if (end > lastSlotEnd) break;
+
+  todaySlots.push({
+    label: `Today, ${formatTime(start)} - ${formatTime(end)}`,
+    start,
+    end,
+  });
+
+  // move to next 1-hour slot
+  start = new Date(end);
+}
 
     // -------------------------
     // 2️⃣ Generate TOMORROW slots (fixed pattern)
@@ -196,10 +209,11 @@ export const getDeliverySlots = async (req, res) => {
 
     for (let i = 10; i <= 19; i++) {
       let start = new Date(base);
-      start.setHours(i, 30, 0);
+      
+      start.setHours(i, 0, 0);
 
       let end = new Date(base);
-      end.setHours(i + 1, 30, 0);
+      end.setHours(i + 1, 0, 0);
 
       tomorrowSlots.push({
         label: `Tomorrow, ${formatTime(start)} - ${formatTime(end)}`,
