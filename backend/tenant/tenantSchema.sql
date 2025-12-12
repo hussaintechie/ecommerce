@@ -139,3 +139,17 @@ CREATE TABLE IF NOT EXISTS tbl_rollno_master (
     nodigit INT 
 );
 insert into tbl_rollno_master(prefix ,lastrollid,nodigit) values ('ORD' ,1 ,4);
+
+create table IF NOT EXISTS tbl_master_order_items (
+    ord_trnid SERIAL PRIMARY KEY,
+	order_id INT NOT NULL,
+    product_id INT NOT NULL,
+	product_name VARCHAR(255),
+    product_unit INT NOT NULL,
+    product_qty INT NOT NULL,
+    product_rate NUMERIC(10,2) NOT NULL,
+    product_amount NUMERIC(10,2) NOT NULL,
+    discount_amt NUMERIC(10,2) NOT NULL,
+    discount_per NUMERIC(10,2) NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
