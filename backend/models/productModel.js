@@ -155,23 +155,29 @@ const orderdataget = async (tenantDB, store_id, limit, offset, searchtxt) => {
   }
 };
 const ordersubmit = async (
-  tenantDB, store_id, user_id, address_delivery, total_amount,
-  order_status, delivery_id, payment_status, items_details
+  tenantDB,
+  store_id,
+  user_id,
+  address_delivery,
+  total_amount,
+  order_status,
+  delivery_id,
+  payment_status,
+  items_details
 ) => {
   try {
-
-    // Roll number query
+    // Get roll number
     const rollnosql = `SELECT * FROM tbl_rollno_master WHERE rollid = 1`;
     const rollnores = await tenantDB.query(rollnosql);
 
-    const prefix = rollnores.rows[0]?.prefix ?? '';
-    const rollid = rollnores.rows[0]?.lastrollid ?? 0;
-    const nodigit = rollnores.rows[0]?.nodigit ?? 2;
+    const prefix = rollnores.rows[0]?.prefix ?? "ORD";
+    const lastId = rollnores.rows[0]?.lastrollid ?? 0;
+    const nodigit = rollnores.rows[0]?.nodigit ?? 4;
 
-    const suffix = rollid.toString().padStart(nodigit, '0');
-    const rollnum = prefix + suffix;
+    const newRollId = (lastId + 1).toString().padStart(nodigit, "0");
+    const order_no = `${prefix}${newRollId}`;
 
-    // Insert into order master
+    // Insert order master
     const ordsql = `
       INSERT INTO tbl_master_orders 
       (order_no, user_id, address_delivery, total_amount, order_status, delivery_id, payment_status)
@@ -180,7 +186,7 @@ const ordersubmit = async (
     `;
 
     const orderRes = await tenantDB.query(ordsql, [
-      rollnum,
+      order_no,
       user_id,
       address_delivery,
       total_amount,
@@ -191,38 +197,47 @@ const ordersubmit = async (
 
     const order_id = orderRes.rows[0].order_id;
 
-      await tenantDB.query(`UPDATE tbl_rollno_master SET lastrollid = lastrollid + 1 WHERE rollid = 1`);
+    // Update roll number
+    await tenantDB.query(
+      `UPDATE tbl_rollno_master SET lastrollid = lastrollid + 1 WHERE rollid = 1`
+    );
+
     // Insert order items
     for (const item of items_details) {
-      const itemSql = `
-        INSERT INTO tbl_master_order_items 
-        (order_id, product_id, product_name, product_unit, product_qty, product_rate, product_amount, discount_amt, discount_per)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8 ,$9)
-      `;
-
-      await tenantDB.query(itemSql, [
-        order_id,
-        item.product_id,
-        item.product_name,
-        item.product_unit,
-        item.product_qty,
-        item.product_rate,
-        item.product_amount,
-        item.discount_amt,
-        item.discount_per
-      ]);
+      await tenantDB.query(
+        `INSERT INTO tbl_master_order_items
+         (order_id, product_id, product_name, product_unit, product_qty,
+          product_rate, product_amount, discount_amt, discount_per)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
+        [
+          order_id,
+          item.product_id,
+          item.product_name,
+          item.product_unit,
+          item.product_qty,
+          item.product_rate,
+          item.product_amount,
+          item.discount_amt,
+          item.discount_per
+        ]
+      );
     }
 
-    // Update roll number
-  
-
-    return { status: 1, message: "Order Saved Successfully", order_no: rollnum, order_id };
+    return {
+      status: 1,
+      message: "Order Saved Successfully",
+      order_no,
+      order_id,
+    };
 
   } catch (error) {
     console.error("Order save error:", error);
     return { status: 0, message: "Order save failed", error };
   }
 };
+
+
+
 
 const allcatedetails = async (tenantDB, store_id, mode_fetchorall, cate_id) => {
   try {

@@ -72,7 +72,7 @@ export const CartModel = {
   // GET USER CART
   listCart: async (db, user_id) => {
     const query = `
-      SELECT c.*, p.title, p.thumbnail, p.price
+      SELECT c.*,  p.title AS product_name,  p.thumbnail, p.price
       FROM tbl_cart c
       LEFT JOIN tbl_master_product p ON p.product_id = c.product_id
       WHERE c.user_id = $1 AND c.status = 'active'
