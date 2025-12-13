@@ -115,38 +115,33 @@ export const getCartBill = async (req, res) => {
         status: 1,
         bill: {
           item_total: 0,
-          handling_fee: 0,
+          handling_fee: 7,
           delivery_fee: 0,
-          minimum_order: 200,
-          remaining_amount: 200,
           to_pay: 0,
         },
       });
     }
 
-    // 2. Calculate totals
-    const item_total = cartItems.reduce((sum, item) => {
-      return sum + item.price * item.quantity;
-    }, 0);
+    // 2. Calculate item total
+    const item_total = cartItems.reduce(
+      (sum, item) => sum + item.price * item.quantity,
+      0
+    );
 
-    const handling_fee = 5; // like zepto
-    const delivery_fee = item_total >= 200 ? 0 : "FREE"; // You can change logic
+    // 🔥 NEW BILLING RULES
+    const HANDLING_FEE = 7;
+    const FREE_DELIVERY_LIMIT = 150;
 
-    const MIN_ORDER = 200;
+    const delivery_fee = item_total < FREE_DELIVERY_LIMIT ? 20 : 0;
 
-    const remaining_amount =
-      item_total >= MIN_ORDER ? 0 : MIN_ORDER - item_total;
-
-    const to_pay = item_total + handling_fee + (delivery_fee === 0 ? 0 : 0);
+    const to_pay = item_total + HANDLING_FEE + delivery_fee;
 
     return res.json({
       status: 1,
       bill: {
         item_total,
-        handling_fee,
+        handling_fee: HANDLING_FEE,
         delivery_fee,
-        minimum_order: MIN_ORDER,
-        remaining_amount,
         to_pay,
       },
     });
@@ -154,6 +149,7 @@ export const getCartBill = async (req, res) => {
     res.status(500).json({ message: error.message });
   }
 };
+
 export const getDeliverySlots = async (req, res) => {
   try {
     const now = new Date();

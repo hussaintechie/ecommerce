@@ -2,7 +2,6 @@
 
 const neweditcat = async (tenantDB, category_name, sts, mode, catid) => {
   try {
-
     if (mode === 0) {
       // CHECK IF CATEGORY EXISTS
       const checkExt = await tenantDB.query(
@@ -27,7 +26,6 @@ const neweditcat = async (tenantDB, category_name, sts, mode, catid) => {
         message: "Category added successfully",
         category_id: insert.rows[0].categories_id,
       };
-
     } else if (mode === 1) {
       // CHECK IF CATEGORY EXISTS (EXCEPT CURRENT ONE)
       const checkExt = await tenantDB.query(
@@ -54,7 +52,6 @@ const neweditcat = async (tenantDB, category_name, sts, mode, catid) => {
         category_id: catid,
       };
     }
-
   } catch (error) {
     console.error("Error in product model:", error);
     return { status: 0, message: "Database error", error };
@@ -113,22 +110,21 @@ const bulkuploaditm = async (tenantDB, fullqry) => {
     await tenantDB.query(productsql);
 
     return { status: 1, message: "Items uploaded successfully" };
-
   } catch (error) {
     console.error("Bulk upload error:", error);
     return { status: 0, message: "Upload failed", error };
   }
 };
 const orderdataget = async (tenantDB, store_id, limit, offset, searchtxt) => {
-//   {
-// "store_id" :1,
-// "limit" :20,
-// "offset" :0,
-// "searchtxt":"hai",
-// "fromdate":"2025-01-02",
-// "todate":"2025-11-30"
-// } api request
-  
+  //   {
+  // "store_id" :1,
+  // "limit" :20,
+  // "offset" :0,
+  // "searchtxt":"hai",
+  // "fromdate":"2025-01-02",
+  // "todate":"2025-11-30"
+  // } api request
+
   try {
     const productsql = `
       SELECT 
@@ -148,7 +144,6 @@ const orderdataget = async (tenantDB, store_id, limit, offset, searchtxt) => {
     const result = await tenantDB.query(productsql, [limit, offset]);
 
     return { status: 1, message: "Order fetched", data: result.rows };
-
   } catch (error) {
     console.error("Order fetch error:", error);
     return { status: 0, message: "Fetch failed", error };
@@ -163,7 +158,8 @@ const ordersubmit = async (
   order_status,
   delivery_id,
   payment_status,
-  items_details
+  items_details,
+  delivery_slot
 ) => {
   try {
     // Get roll number
@@ -180,8 +176,8 @@ const ordersubmit = async (
     // Insert order master
     const ordsql = `
       INSERT INTO tbl_master_orders 
-      (order_no, user_id, address_delivery, total_amount, order_status, delivery_id, payment_status)
-      VALUES ($1, $2, $3, $4, $5, $6, $7)
+      (order_no, user_id, address_delivery,delivery_slot, total_amount, order_status, delivery_id, payment_status)
+      VALUES ($1, $2, $3, $4, $5, $6, $7,$8)
       RETURNING order_id
     `;
 
@@ -189,10 +185,11 @@ const ordersubmit = async (
       order_no,
       user_id,
       address_delivery,
+      delivery_slot,
       total_amount,
       order_status,
       delivery_id,
-      payment_status
+      payment_status,
     ]);
 
     const order_id = orderRes.rows[0].order_id;
@@ -218,7 +215,7 @@ const ordersubmit = async (
           item.product_rate,
           item.product_amount,
           item.discount_amt,
-          item.discount_per
+          item.discount_per,
         ]
       );
     }
@@ -229,19 +226,14 @@ const ordersubmit = async (
       order_no,
       order_id,
     };
-
   } catch (error) {
     console.error("Order save error:", error);
     return { status: 0, message: "Order save failed", error };
   }
 };
 
-
-
-
 const allcatedetails = async (tenantDB, store_id, mode_fetchorall, cate_id) => {
   try {
-
     let catetsql = `SELECT * FROM tbl_master_categories`;
     let params = [];
 
@@ -250,12 +242,9 @@ const allcatedetails = async (tenantDB, store_id, mode_fetchorall, cate_id) => {
       params.push(cate_id);
     }
 
-
-
     const result = await tenantDB.query(catetsql, params);
 
     return { status: 1, message: "Category fetched", data: result.rows };
-
   } catch (error) {
     console.error("Category fetch error:", error);
     return { status: 0, message: "Fetch failed", error };
@@ -263,13 +252,11 @@ const allcatedetails = async (tenantDB, store_id, mode_fetchorall, cate_id) => {
 };
 const catitems = async (tenantDB, store_id, cate_id) => {
   try {
-
     let cateitmsql = `select * from tbl_master_product as itm where categories_id =${cate_id}`;
-    
+
     const result = await tenantDB.query(cateitmsql);
 
     return { status: 1, message: "Items fetched", data: result.rows };
-
   } catch (error) {
     console.error("Items fetch error:", error);
     return { status: 0, message: "Items Fetch failed", error };
@@ -283,28 +270,24 @@ const getuserorders = async (tenantDB, store_id, userid) => {
     let data = {
       processed: [],
       delivered: [],
-      cancelled: []
+      cancelled: [],
     };
-
 
     for (const item of result.rows) {
       if (item.order_status === "Process") {
         data.processed.push(item);
-      }
-      else if (item.order_status === "Delivered") {
+      } else if (item.order_status === "Delivered") {
         data.delivered.push(item);
-      }
-      else if (item.order_status === "Cancelled") {
+      } else if (item.order_status === "Cancelled") {
         data.cancelled.push(item);
       }
     }
 
-    return { 
-      status: 1, 
+    return {
+      status: 1,
       message: "User orders fetched successfully",
-      data: data 
+      data: data,
     };
-
   } catch (error) {
     console.error("Items fetch error:", error);
     return { status: 0, message: "Items Fetch failed", error };
@@ -312,7 +295,6 @@ const getuserorders = async (tenantDB, store_id, userid) => {
 };
 const singleorddetail = async (tenantDB, store_id, orderid) => {
   try {
-
     const userorderitmsql = `
       SELECT 
         itm.product_name AS itmname, 
@@ -325,7 +307,6 @@ const singleorddetail = async (tenantDB, store_id, orderid) => {
       WHERE itm.order_id = ${orderid}
       GROUP BY itm.product_id, itm.product_name, itm.product_qty, um.unitname
     `;
-
 
     const orderothrsql = `
       SELECT  
@@ -350,14 +331,12 @@ const singleorddetail = async (tenantDB, store_id, orderid) => {
       itmdetails: [],
       address: null,
       billdetails: {},
-      paydetails: {}
+      paydetails: {},
     };
-
 
     for (const item of itmresult.rows) {
       data.itmdetails.push(item);
     }
-
 
     if (otherresult.rows.length > 0) {
       const info = otherresult.rows[0];
@@ -366,27 +345,25 @@ const singleorddetail = async (tenantDB, store_id, orderid) => {
 
       data.billdetails = {
         bill_amount: info.itmamt,
-        discount_amount: info.disamt
+        discount_amount: info.disamt,
       };
 
       data.paydetails = {
         pay_mode: info.pay_method,
-        pay_date: info.pay_date
+        pay_date: info.pay_date,
       };
     }
 
-    return { 
-      status: 1, 
+    return {
+      status: 1,
       message: "Order details fetched successfully",
-      data: data 
+      data: data,
     };
-
   } catch (error) {
     console.error("Order fetch error:", error);
     return { status: 0, message: "Order Fetch failed", error };
   }
 };
-
 
 // EXPORT DEFAULT
 export default {
@@ -397,5 +374,5 @@ export default {
   allcatedetails,
   catitems,
   getuserorders,
-  singleorddetail
+  singleorddetail,
 };

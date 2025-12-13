@@ -305,6 +305,7 @@ export const submitorder = async (req, res) => {
       total_amount,
       order_status,
       delivery_id,
+      delivery_slot,
       payment_status,
       payment_method,
       razorpay_payment_id,
@@ -326,6 +327,7 @@ export const submitorder = async (req, res) => {
         message: "Product Details required",
       });
     }
+
     if (payment_method === "Online") {
       const isValid = isValidRazorpaySignature(
         razorpay_order_id,
@@ -362,7 +364,8 @@ export const submitorder = async (req, res) => {
       order_status,
       delivery_id,
       payment_status,
-      items_details
+      items_details,
+      delivery_slot
     );
 
     const newOrderId = orderdatares.order_id;
