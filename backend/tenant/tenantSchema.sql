@@ -153,3 +153,12 @@ create table IF NOT EXISTS tbl_master_order_items (
     discount_per NUMERIC(10,2) NOT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+
+
+
+alter table tbl_master_product
+add column product_status BOOLEAN 
+
+
+alter table tbl_master_product
+add column stock int

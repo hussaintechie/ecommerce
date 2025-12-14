@@ -4,6 +4,8 @@ import { getTenantPool } from "../config/tenantDB.js";
 import productmodel from "../models/productModel.js";
 import crypto from "crypto";
 
+
+
 // -----------------------------
 // Razorpay Signature Validation
 // -----------------------------
@@ -297,24 +299,28 @@ export const orderdatas = async (req, res) => {
     });
   }
 };
-
 export const submitorder = async (req, res) => {
+  let tenantDB;
+
   try {
     const {
       address_delivery,
       total_amount,
       order_status,
       delivery_id,
+      delivery_slot,
       payment_status,
       payment_method,
       razorpay_payment_id,
-      razorpay_order_id, // ← MUST ADD
+      razorpay_order_id,
       razorpay_signature,
       items_details,
     } = req.body;
 
     const register_id = req.user.register_id;
     const user_id = req.user.user_id;
+
+    /* ---------------- VALIDATIONS ---------------- */
 
     if (!register_id) {
       return res.status(400).json({ status: 0, message: "Store ID required" });
@@ -326,6 +332,7 @@ export const submitorder = async (req, res) => {
         message: "Product Details required",
       });
     }
+
     if (payment_method === "Online") {
       const isValid = isValidRazorpaySignature(
         razorpay_order_id,
@@ -341,18 +348,28 @@ export const submitorder = async (req, res) => {
       }
     }
 
-    // Get tenant DB
+    /* ---------------- TENANT DB ---------------- */
+
     const t = await pool.query(
       "SELECT db_name FROM tbl_tenant_databases WHERE register_id=$1",
       [register_id]
     );
 
-    if (t.rows.length === 0)
-      return res.status(400).json({ status: 0, message: "Store not found" });
+    if (t.rows.length === 0) {
+      return res.status(400).json({
+        status: 0,
+        message: "Store not found",
+      });
+    }
 
-    const tenantDB = getTenantPool(t.rows[0].db_name);
+    tenantDB = getTenantPool(t.rows[0].db_name);
 
-    // Insert order + items
+    /* ---------------- START TRANSACTION ---------------- */
+
+    await tenantDB.query("BEGIN");
+
+    /* ---------------- CREATE ORDER ---------------- */
+
     const orderdatares = await productmodel.ordersubmit(
       tenantDB,
       register_id,
@@ -362,20 +379,34 @@ export const submitorder = async (req, res) => {
       order_status,
       delivery_id,
       payment_status,
-      items_details
+      items_details,
+      delivery_slot
     );
+
+    // 🚨 CRITICAL CHECK
+    if (!orderdatares || orderdatares.status !== 1 || !orderdatares.order_id) {
+      await tenantDB.query("ROLLBACK");
+      return res.status(500).json({
+        status: 0,
+        message: "Order creation failed",
+        error: orderdatares?.error || "Unknown error",
+      });
+    }
 
     const newOrderId = orderdatares.order_id;
 
-    // Payment ID
-    const externalPayId = razorpay_payment_id || "COD"; // Razorpay or COD
+    /* ---------------- INSERT PAYMENT ---------------- */
+
+    const externalPayId = razorpay_payment_id || "COD";
     const transaction_id =
       payment_method === "Online" ? razorpay_payment_id : null;
-    // Insert payment row
+
     await tenantDB.query(
-      `INSERT INTO tbl_master_payment
-       (order_id,transaction_id, method, external_payment_id, status)
-       VALUES ($1, $2, $3, $4,$5)`,
+      `
+      INSERT INTO tbl_master_payment
+      (order_id, transaction_id, method, external_payment_id, status)
+      VALUES ($1, $2, $3, $4, $5)
+      `,
       [
         newOrderId,
         transaction_id,
@@ -385,14 +416,29 @@ export const submitorder = async (req, res) => {
       ]
     );
 
+    /* ---------------- COMMIT ---------------- */
+
+    await tenantDB.query("COMMIT");
+
     return res.status(200).json({
       status: 1,
       message: "Order submitted successfully",
       order_no: orderdatares.order_no,
       order_id: newOrderId,
     });
+
   } catch (err) {
     console.error("Order Submit Error:", err);
+
+    // rollback only if transaction started
+    if (tenantDB) {
+      try {
+        await tenantDB.query("ROLLBACK");
+      } catch (e) {
+        console.error("Rollback failed:", e);
+      }
+    }
+
     return res.status(500).json({
       status: 0,
       message: "Server Error",
@@ -608,3 +654,4 @@ export const singleorddetail = async (req, res) => {
     });
   }
 };
+
