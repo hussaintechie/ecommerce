@@ -4,8 +4,6 @@ import { getTenantPool } from "../config/tenantDB.js";
 import productmodel from "../models/productModel.js";
 import crypto from "crypto";
 
-
-
 // -----------------------------
 // Razorpay Signature Validation
 // -----------------------------
@@ -304,18 +302,21 @@ export const submitorder = async (req, res) => {
 
   try {
     const {
-      address_delivery,
-      total_amount,
-      order_status,
-      delivery_id,
-      delivery_slot,
-      payment_status,
-      payment_method,
-      razorpay_payment_id,
-      razorpay_order_id,
-      razorpay_signature,
-      items_details,
-    } = req.body;
+  address_delivery,
+  total_amount,
+  item_total,
+  handling_fee,      // ✅ ADD
+  delivery_fee,      // ✅ ADD
+  order_status,
+  delivery_id,
+  delivery_slot,
+  payment_status,
+  payment_method,
+  razorpay_payment_id,
+  razorpay_order_id,
+  razorpay_signature,
+  items_details,
+} = req.body;
 
     const register_id = req.user.register_id;
     const user_id = req.user.user_id;
@@ -371,17 +372,20 @@ export const submitorder = async (req, res) => {
     /* ---------------- CREATE ORDER ---------------- */
 
     const orderdatares = await productmodel.ordersubmit(
-      tenantDB,
-      register_id,
-      user_id,
-      address_delivery,
-      total_amount,
-      order_status,
-      delivery_id,
-      payment_status,
-      items_details,
-      delivery_slot
-    );
+  tenantDB,
+  register_id,
+  user_id,
+  address_delivery,
+  total_amount,
+  handling_fee,     // ✅ FIXED
+  delivery_fee,     // ✅ FIXED
+  order_status,
+  delivery_id,
+  payment_status,
+  items_details,
+  delivery_slot
+);
+
 
     // 🚨 CRITICAL CHECK
     if (!orderdatares || orderdatares.status !== 1 || !orderdatares.order_id) {
@@ -426,7 +430,6 @@ export const submitorder = async (req, res) => {
       order_no: orderdatares.order_no,
       order_id: newOrderId,
     });
-
   } catch (err) {
     console.error("Order Submit Error:", err);
 
@@ -654,4 +657,3 @@ export const singleorddetail = async (req, res) => {
     });
   }
 };
-

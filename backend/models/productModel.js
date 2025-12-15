@@ -155,6 +155,8 @@ const ordersubmit = async (
   user_id,
   address_delivery,
   total_amount,
+   handling_fee,
+   delivery_fee,
   order_status,
   delivery_id,
   payment_status,
@@ -175,11 +177,23 @@ const ordersubmit = async (
 
     // Insert order master
     const ordsql = `
-      INSERT INTO tbl_master_orders 
-      (order_no, user_id, address_delivery,delivery_slot, total_amount, order_status, delivery_id, payment_status)
-      VALUES ($1, $2, $3, $4, $5, $6, $7,$8)
-      RETURNING order_id
-    `;
+  INSERT INTO tbl_master_orders 
+  (
+    order_no,
+    user_id,
+    address_delivery,
+    delivery_slot,
+    total_amount,
+    handling_fee,
+    delivery_fee,
+    order_status,
+    delivery_id,
+    payment_status
+  )
+  VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
+  RETURNING order_id
+`;
+
 
     const orderRes = await tenantDB.query(ordsql, [
       order_no,
@@ -187,6 +201,9 @@ const ordersubmit = async (
       address_delivery,
       delivery_slot,
       total_amount,
+      handling_fee,
+
+      delivery_fee,
       order_status,
       delivery_id,
       payment_status,
@@ -309,37 +326,38 @@ const getuserorders = async (tenantDB, store_id, userid) => {
 
 const singleorddetail = async (tenantDB, store_id, orderid) => {
   try {
+    /* ---------------- ITEMS ---------------- */
     const userorderitmsql = `
       SELECT 
         itm.product_name AS itmname, 
-        SUM(itm.product_amount) AS itmamt,
+        itm.product_amount AS itmamt,
         itm.product_qty AS qty,
         um.unitname AS unit
-      FROM tbl_master_order_items AS itm
-      INNER JOIN unitofmeasure_master AS um  
+      FROM tbl_master_order_items itm
+      INNER JOIN unitofmeasure_master um  
         ON itm.product_unit = um.unitid 
-      WHERE itm.order_id = ${orderid}
-      GROUP BY itm.product_id, itm.product_name, itm.product_qty, um.unitname
+      WHERE itm.order_id = $1
     `;
 
+    /* ---------------- BILL + PAYMENT ---------------- */
     const orderothrsql = `
-      SELECT  
-        SUM(itm.product_amount) AS itmamt,
-        SUM(itm.discount_amt) AS disamt,
+      SELECT
+        ord.total_amount,
+        ord.handling_fee,
+        ord.delivery_fee,
+       
+        ord.total_amount,
         ord.address_delivery AS address,
         pay.method AS pay_method,
         TO_CHAR(ord.created_at, 'DD-Mon-YYYY') AS pay_date
-      FROM tbl_master_orders AS ord
-      INNER JOIN tbl_master_order_items AS itm 
-        ON ord.order_id = itm.order_id
-      INNER JOIN tbl_master_payment AS pay 
+      FROM tbl_master_orders ord
+      INNER JOIN tbl_master_payment pay
         ON pay.order_id = ord.order_id
-      WHERE ord.order_id = ${orderid}
-      GROUP BY ord.order_id, pay.method, ord.address_delivery
+      WHERE ord.order_id = $1
     `;
 
-    const itmresult = await tenantDB.query(userorderitmsql);
-    const otherresult = await tenantDB.query(orderothrsql);
+    const itmresult = await tenantDB.query(userorderitmsql, [orderid]);
+    const otherresult = await tenantDB.query(orderothrsql, [orderid]);
 
     let data = {
       itmdetails: [],
@@ -348,18 +366,21 @@ const singleorddetail = async (tenantDB, store_id, orderid) => {
       paydetails: {},
     };
 
-    for (const item of itmresult.rows) {
-      data.itmdetails.push(item);
-    }
+    /* ITEMS */
+    data.itmdetails = itmresult.rows;
 
+    /* BILL + PAYMENT */
     if (otherresult.rows.length > 0) {
       const info = otherresult.rows[0];
 
       data.address = info.address;
 
       data.billdetails = {
-        bill_amount: info.itmamt,
-        discount_amount: info.disamt,
+        item_total: Number(info.item_total || 0),
+        handling_fee: Number(info.handling_fee || 0),
+        delivery_fee: Number(info.delivery_fee || 0),
+        discount_amount: Number(info.discount_amount || 0),
+        total_amount: Number(info.total_amount || 0),
       };
 
       data.paydetails = {
@@ -371,7 +392,7 @@ const singleorddetail = async (tenantDB, store_id, orderid) => {
     return {
       status: 1,
       message: "Order details fetched successfully",
-      data: data,
+      data,
     };
   } catch (error) {
     console.error("Order fetch error:", error);
