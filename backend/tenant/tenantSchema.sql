@@ -163,26 +163,17 @@ add column product_status BOOLEAN
 alter table tbl_master_product
 add column stock int
 
-
-alter table tbl_master_orders
-add column handling_fee varchar(255)
-
-
-alter table tbl_master_orders
-add column delivery_fee varchar(255)
+CREATE TABLE tbl_order_tracking (
+  id SERIAL PRIMARY KEY,
+  order_id INT,
+  status VARCHAR(30),
+  created_at TIMESTAMP DEFAULT NOW()
+);
 
 
 
 ALTER TABLE tbl_master_orders
 ADD COLUMN delivery_otp VARCHAR(6),
 ADD COLUMN otp_verified BOOLEAN DEFAULT false;
-
-
-
-CREATE TABLE tbl_order_tracking (
-  id SERIAL PRIMARY KEY,
-  order_id INT,
-  status VARCHAR(30),
-  message TEXT,
-  created_at TIMESTAMP DEFAULT NOW()
-);
+ALTER TABLE tbl_master_orders
+ADD COLUMN otp_generated_at timestamp

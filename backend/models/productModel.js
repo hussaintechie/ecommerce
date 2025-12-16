@@ -151,12 +151,12 @@ const orderdataget = async (tenantDB, store_id, limit, offset, searchtxt) => {
 };
 const ordersubmit = async (
   tenantDB,
-  store_id,
+
   user_id,
   address_delivery,
   total_amount,
-   handling_fee,
-   delivery_fee,
+  handling_fee,
+  delivery_fee,
   order_status,
   delivery_id,
   payment_status,
@@ -164,9 +164,12 @@ const ordersubmit = async (
   delivery_slot
 ) => {
   try {
-    // Get roll number
-    const rollnosql = `SELECT * FROM tbl_rollno_master WHERE rollid = 1`;
-    const rollnores = await tenantDB.query(rollnosql);
+    await tenantDB.query("BEGIN");
+
+    // Roll number
+    const rollnores = await tenantDB.query(
+      `SELECT * FROM tbl_rollno_master WHERE rollid = 1 FOR UPDATE`
+    );
 
     const prefix = rollnores.rows[0]?.prefix ?? "ORD";
     const lastId = rollnores.rows[0]?.lastrollid ?? 0;
@@ -175,39 +178,29 @@ const ordersubmit = async (
     const newRollId = (lastId + 1).toString().padStart(nodigit, "0");
     const order_no = `${prefix}${newRollId}`;
 
-    // Insert order master
-    const ordsql = `
-  INSERT INTO tbl_master_orders 
-  (
-    order_no,
-    user_id,
-    address_delivery,
-    delivery_slot,
-    total_amount,
-    handling_fee,
-    delivery_fee,
-    order_status,
-    delivery_id,
-    payment_status
-  )
-  VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
-  RETURNING order_id
-`;
-
-
-    const orderRes = await tenantDB.query(ordsql, [
-      order_no,
-      user_id,
-      address_delivery,
-      delivery_slot,
-      total_amount,
-      handling_fee,
-
-      delivery_fee,
-      order_status,
-      delivery_id,
-      payment_status,
-    ]);
+    // Insert order
+    const orderRes = await tenantDB.query(
+      `
+      INSERT INTO tbl_master_orders
+      (order_no, user_id, address_delivery, delivery_slot,
+       total_amount, handling_fee, delivery_fee,
+       order_status, delivery_id, payment_status)
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
+      RETURNING order_id
+      `,
+      [
+        order_no,
+        user_id,
+        address_delivery,
+        delivery_slot,
+        total_amount,
+        handling_fee,
+        delivery_fee,
+        order_status,
+        delivery_id,
+        payment_status,
+      ]
+    );
 
     const order_id = orderRes.rows[0].order_id;
 
@@ -216,13 +209,16 @@ const ordersubmit = async (
       `UPDATE tbl_rollno_master SET lastrollid = lastrollid + 1 WHERE rollid = 1`
     );
 
-    // Insert order items
+    // Insert items
     for (const item of items_details) {
       await tenantDB.query(
-        `INSERT INTO tbl_master_order_items
-         (order_id, product_id, product_name, product_unit, product_qty,
-          product_rate, product_amount, discount_amt, discount_per)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
+        `
+        INSERT INTO tbl_master_order_items
+        (order_id, product_id, product_name, product_unit,
+         product_qty, product_rate, product_amount,
+         discount_amt, discount_per)
+        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
+        `,
         [
           order_id,
           item.product_id,
@@ -243,6 +239,14 @@ await tenantDB.query(
   [order_id]
 );
 
+    // Insert tracking
+    await tenantDB.query(
+      `INSERT INTO tbl_order_tracking (order_id, status) VALUES ($1,'Pending')`,
+      [order_id]
+    );
+
+    await tenantDB.query("COMMIT");
+
     return {
       status: 1,
       message: "Order Saved Successfully",
@@ -251,8 +255,9 @@ await tenantDB.query(
     };
     
   } catch (error) {
+    await tenantDB.query("ROLLBACK");
     console.error("Order save error:", error);
-    return { status: 0, message: "Order save failed", error };
+    return { status: 0, message: "Order save failed" };
   }
 };
 
@@ -303,7 +308,6 @@ const getuserorders = async (tenantDB, store_id, userid) => {
     const result = await tenantDB.query(userordersql, [userid]);
     console.log(result.rows);
 
-
     let data = {
       processed: [],
       delivered: [],
@@ -311,11 +315,11 @@ const getuserorders = async (tenantDB, store_id, userid) => {
     };
 
     for (const item of result.rows) {
-      if (item.order_status === "Process" || item.order_status === "Pending") {
+      if (item.order_status === "Process" || item.order_status === "Pending") { 
         data.processed.push(item);
-      } else if (item.order_status === "Delivered") {
+      } else if (item.order_status === "delivered") { 
         data.delivered.push(item);
-      } else if (item.order_status === "Cancelled") {
+      } else if (item.order_status === "cancelled") {
         data.cancelled.push(item);
       }
     }
@@ -470,6 +474,7 @@ const trackOrder = async (tenantDB, order_id) => {
   return { status: 1, data: res.rows };
 };
 
+
 // EXPORT DEFAULT
 export default {
   neweditcat,
@@ -480,7 +485,5 @@ export default {
   catitems,
   getuserorders,
   singleorddetail,
-  markOutForDelivery,
-  verifyDeliveryOTP,
-  trackOrder,
+  
 };

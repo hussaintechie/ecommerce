@@ -302,21 +302,21 @@ export const submitorder = async (req, res) => {
 
   try {
     const {
-  address_delivery,
-  total_amount,
-  item_total,
-  handling_fee,      // ✅ ADD
-  delivery_fee,      // ✅ ADD
-  order_status,
-  delivery_id,
-  delivery_slot,
-  payment_status,
-  payment_method,
-  razorpay_payment_id,
-  razorpay_order_id,
-  razorpay_signature,
-  items_details,
-} = req.body;
+      address_delivery,
+      total_amount,
+      item_total,
+      handling_fee, // ✅ ADD
+      delivery_fee, // ✅ ADD
+      order_status,
+      delivery_id,
+      delivery_slot,
+      payment_status,
+      payment_method,
+      razorpay_payment_id,
+      razorpay_order_id,
+      razorpay_signature,
+      items_details,
+    } = req.body;
 
     const register_id = req.user.register_id;
     const user_id = req.user.user_id;
@@ -372,20 +372,19 @@ export const submitorder = async (req, res) => {
     /* ---------------- CREATE ORDER ---------------- */
 
     const orderdatares = await productmodel.ordersubmit(
-  tenantDB,
-  register_id,
-  user_id,
-  address_delivery,
-  total_amount,
-  handling_fee,     // ✅ FIXED
-  delivery_fee,     // ✅ FIXED
-  order_status,
-  delivery_id,
-  payment_status,
-  items_details,
-  delivery_slot
-);
+      tenantDB,
 
+      user_id,
+      address_delivery,
+      total_amount,
+      handling_fee, // ✅ FIXED
+      delivery_fee, // ✅ FIXED
+      order_status,
+      delivery_id,
+      payment_status,
+      items_details,
+      delivery_slot
+    );
 
     // 🚨 CRITICAL CHECK
     if (!orderdatares || orderdatares.status !== 1 || !orderdatares.order_id) {
@@ -657,66 +656,135 @@ export const singleorddetail = async (req, res) => {
     });
   }
 };
-
 export const markOutForDelivery = async (req, res) => {
   try {
     const { order_id } = req.body;
     const register_id = req.user.register_id;
 
-    const dbRes = await pool.query(
-      "SELECT db_name FROM tbl_tenant_databases WHERE register_id=$1",
-      [register_id]
-    );
+    if (!order_id) {
+      return res.status(400).json({
+        status: 0,
+        message: "Order ID required",
+      });
+    }
 
-    const tenantDB = getTenantPool(dbRes.rows[0].db_name);
+    // 🔹 GET TENANT DB
+    const tenantQuery = `
+      SELECT db_name 
+      FROM tbl_tenant_databases 
+      WHERE register_id = $1
+    `;
+    const result = await pool.query(tenantQuery, [register_id]);
 
-    const result = await productmodel.markOutForDelivery(
-      tenantDB,
-      order_id
-    );
+    if (result.rows.length === 0) {
+      return res.status(400).json({
+        status: 0,
+        message: "Store not found",
+      });
+    }
 
-    res.json(result);
+    const tenantDB = getTenantPool(result.rows[0].db_name);
+
+    // 🔹 CALL MODEL
+    const response = await productmodel.markOutForDelivery(tenantDB, order_id);
+
+    return res.status(200).json(response);
   } catch (err) {
-    res.status(500).json({ status: 0, message: err.message });
+    console.error("markOutForDelivery error:", err);
+    return res.status(500).json({
+      status: 0,
+      message: "Server error",
+      error: err.message,
+    });
   }
 };
+
 export const verifyDeliveryOTP = async (req, res) => {
   try {
     const { order_id, otp } = req.body;
     const register_id = req.user.register_id;
 
-    const dbRes = await pool.query(
-      "SELECT db_name FROM tbl_tenant_databases WHERE register_id=$1",
-      [register_id]
-    );
+    if (!order_id || !otp) {
+      return res.status(400).json({
+        status: 0,
+        message: "Order ID and OTP required",
+      });
+    }
 
-    const tenantDB = getTenantPool(dbRes.rows[0].db_name);
+    // 🔹 GET TENANT DB
+    const tenantQuery = `
+      SELECT db_name 
+      FROM tbl_tenant_databases 
+      WHERE register_id = $1
+    `;
+    const result = await pool.query(tenantQuery, [register_id]);
 
-    const result = await productmodel.verifyDeliveryOTP(
+    if (result.rows.length === 0) {
+      return res.status(400).json({
+        status: 0,
+        message: "Store not found",
+      });
+    }
+
+    const tenantDB = getTenantPool(result.rows[0].db_name);
+
+    // 🔹 CALL MODEL
+    const response = await productmodel.verifyDeliveryOTP(
       tenantDB,
       order_id,
       otp
     );
 
-    res.json(result);
+    return res.status(200).json(response);
   } catch (err) {
-    res.status(500).json({ status: 0, message: err.message });
+    console.error("verifyDeliveryOTP error:", err);
+    return res.status(500).json({
+      status: 0,
+      message: "Server error",
+      error: err.message,
+    });
   }
 };
 
-
 export const trackOrder = async (req, res) => {
-  const { order_id } = req.params;
-  const register_id = req.user.register_id;
+  try {
+    const { order_id } = req.body;
+    const register_id = req.user.register_id;
 
-  const dbRes = await pool.query(
-    "SELECT db_name FROM tbl_tenant_databases WHERE register_id=$1",
-    [register_id]
-  );
+    if (!order_id) {
+      return res.status(400).json({
+        status: 0,
+        message: "Order ID required",
+      });
+    }
 
-  const tenantDB = getTenantPool(dbRes.rows[0].db_name);
+    // 🔹 GET TENANT DB
+    const tenantQuery = `
+      SELECT db_name 
+      FROM tbl_tenant_databases 
+      WHERE register_id = $1
+    `;
+    const result = await pool.query(tenantQuery, [register_id]);
 
-  const result = await productmodel.trackOrder(tenantDB, order_id);
+    if (result.rows.length === 0) {
+      return res.status(400).json({
+        status: 0,
+        message: "Store not found",
+      });
+    }
 
-  res.json(result);
+    const tenantDB = getTenantPool(result.rows[0].db_name);
+
+    // 🔹 CALL MODEL
+    const response = await productmodel.trackOrder(tenantDB, order_id);
+
+    return res.status(200).json(response);
+  } catch (err) {
+    console.error("trackOrder error:", err);
+    return res.status(500).json({
+      status: 0,
+      message: "Server error",
+      error: err.message,
+    });
+  }
 };

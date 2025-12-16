@@ -4,7 +4,7 @@ import {auth} from "../middleware/authMiddleware.js"
 
 const router = express.Router();
 // router.use(auth)
-
+router.use(auth)
 router.post("/create-order", createRazorpayOrder);
 
 export default router;
