@@ -8,8 +8,9 @@ import addressModel_user from "./routes/addressRouter_user.js";
 import favoriteRoutes_user from "./routes/favoriteRoutes_user.js";
 import profileRoutes_user from "./routes/profileRoutes_user.js";
 import cartRoutes_user from "./routes/cartRoutes_user.js";
-import paymentRoutes from "./routes/paymentRoutes.js"
+import paymentRoutes from "./routes/paymentRoutes.js";
 import reorderRoutes_user from "./routes/reorderRoutes_user.js";
+import trackorderRoutes_user from "./routes/trackorderRoutes_user.js";
 
 import dotenv from "dotenv";
 dotenv.config();
@@ -19,14 +20,13 @@ app.use(
   cors({
     origin: "http://localhost:5173",
     credentials: true,
-  
   })
 );
 
-
 app.use(express.json());
 app.use("/api/payment", paymentRoutes);
-app.use("/ruser",reorderRoutes_user)
+app.use("/ruser", reorderRoutes_user);
+app.use("/tuser", trackorderRoutes_user);
 
 app.use("/auth", authRoutes);
 app.use("/fuser", favoriteRoutes_user);

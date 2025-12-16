@@ -162,3 +162,16 @@ add column product_status BOOLEAN
 
 alter table tbl_master_product
 add column stock int
+
+CREATE TABLE tbl_order_tracking (
+  id SERIAL PRIMARY KEY,
+  order_id INT,
+  status VARCHAR(30),
+  created_at TIMESTAMP DEFAULT NOW()
+);
+
+
+
+ALTER TABLE tbl_master_orders
+ADD COLUMN delivery_otp VARCHAR(6),
+ADD COLUMN otp_verified BOOLEAN DEFAULT false;

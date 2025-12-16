@@ -1,5 +1,4 @@
 import jwt from "jsonwebtoken";
-
 export const auth = (req, res, next) => {
   if (process.env.DEV_MODE === "true") {
     req.user = {
@@ -9,6 +8,13 @@ export const auth = (req, res, next) => {
     };
     return next();
   }
+
+  return res.status(401).json({
+    status: 0,
+    message: "Unauthorized (DEV_MODE disabled)",
+  });
+};
+
   // try {
   //   const header = req.headers.authorization;
 
@@ -24,4 +30,4 @@ export const auth = (req, res, next) => {
   // } catch (err) {
   //   return res.status(401).json({ status: 0, message: "Token expired or invalid" });
   // }
-};
+
