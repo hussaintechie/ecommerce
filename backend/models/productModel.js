@@ -236,6 +236,12 @@ const ordersubmit = async (
         ]
       );
     }
+// INSERT INITIAL TRACKING
+await tenantDB.query(
+  `INSERT INTO tbl_order_tracking (order_id, status, message)
+   VALUES ($1, 'pending', 'Order placed successfully')`,
+  [order_id]
+);
 
     return {
       status: 1,
@@ -243,6 +249,7 @@ const ordersubmit = async (
       order_no,
       order_id,
     };
+    
   } catch (error) {
     console.error("Order save error:", error);
     return { status: 0, message: "Order save failed", error };
@@ -398,8 +405,70 @@ const singleorddetail = async (tenantDB, store_id, orderid) => {
     console.error("Order fetch error:", error);
     return { status: 0, message: "Order Fetch failed", error };
   }
+  
 };
 
+const markOutForDelivery = async (tenantDB, order_id) => {
+  const otp = Math.floor(100000 + Math.random() * 900000).toString();
+
+  await tenantDB.query(
+    `UPDATE tbl_master_orders
+     SET order_status='OutForDelivery', delivery_otp=$1
+     WHERE order_id=$2`,
+    [otp, order_id]
+  );
+
+  await tenantDB.query(
+    `INSERT INTO tbl_order_tracking (order_id, status, message)
+     VALUES ($1, 'out_for_delivery', 'Order out for delivery')`,
+    [order_id]
+  );
+
+  return { status: 1, message: "Order out for delivery", otp };
+};
+const verifyDeliveryOTP = async (tenantDB, order_id, otp) => {
+  const res = await tenantDB.query(
+    `SELECT delivery_otp FROM tbl_master_orders
+     WHERE order_id=$1 AND order_status='OutForDelivery'`,
+    [order_id]
+  );
+
+  if (res.rowCount === 0) {
+    return { status: 0, message: "Invalid order" };
+  }
+
+  if (res.rows[0].delivery_otp !== otp) {
+    return { status: 0, message: "Invalid OTP" };
+  }
+
+  await tenantDB.query(
+    `UPDATE tbl_master_orders
+     SET order_status='Delivered', otp_verified=true
+     WHERE order_id=$1`,
+    [order_id]
+  );
+
+  await tenantDB.query(
+    `INSERT INTO tbl_order_tracking (order_id, status, message)
+     VALUES ($1, 'delivered', 'Order delivered successfully')`,
+    [order_id]
+  );
+
+  return { status: 1, message: "Order delivered successfully" };
+};
+
+
+const trackOrder = async (tenantDB, order_id) => {
+  const res = await tenantDB.query(
+    `SELECT status, message, created_at
+     FROM tbl_order_tracking
+     WHERE order_id=$1
+     ORDER BY created_at`,
+    [order_id]
+  );
+
+  return { status: 1, data: res.rows };
+};
 
 // EXPORT DEFAULT
 export default {
@@ -411,4 +480,7 @@ export default {
   catitems,
   getuserorders,
   singleorddetail,
+  markOutForDelivery,
+  verifyDeliveryOTP,
+  trackOrder,
 };

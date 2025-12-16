@@ -196,7 +196,7 @@ export const createitmfile = async (req, res) => {
 
     const tenantDB = getTenantPool(result.rows[0].db_name);
 
-    console.log("Excel Data:", rows);
+   
 
     // Prepare VALUES query
     let values = [];
@@ -656,4 +656,67 @@ export const singleorddetail = async (req, res) => {
       error: err.message,
     });
   }
+};
+
+export const markOutForDelivery = async (req, res) => {
+  try {
+    const { order_id } = req.body;
+    const register_id = req.user.register_id;
+
+    const dbRes = await pool.query(
+      "SELECT db_name FROM tbl_tenant_databases WHERE register_id=$1",
+      [register_id]
+    );
+
+    const tenantDB = getTenantPool(dbRes.rows[0].db_name);
+
+    const result = await productmodel.markOutForDelivery(
+      tenantDB,
+      order_id
+    );
+
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ status: 0, message: err.message });
+  }
+};
+export const verifyDeliveryOTP = async (req, res) => {
+  try {
+    const { order_id, otp } = req.body;
+    const register_id = req.user.register_id;
+
+    const dbRes = await pool.query(
+      "SELECT db_name FROM tbl_tenant_databases WHERE register_id=$1",
+      [register_id]
+    );
+
+    const tenantDB = getTenantPool(dbRes.rows[0].db_name);
+
+    const result = await productmodel.verifyDeliveryOTP(
+      tenantDB,
+      order_id,
+      otp
+    );
+
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ status: 0, message: err.message });
+  }
+};
+
+
+export const trackOrder = async (req, res) => {
+  const { order_id } = req.params;
+  const register_id = req.user.register_id;
+
+  const dbRes = await pool.query(
+    "SELECT db_name FROM tbl_tenant_databases WHERE register_id=$1",
+    [register_id]
+  );
+
+  const tenantDB = getTenantPool(dbRes.rows[0].db_name);
+
+  const result = await productmodel.trackOrder(tenantDB, order_id);
+
+  res.json(result);
 };
