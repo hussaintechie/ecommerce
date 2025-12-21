@@ -11,14 +11,15 @@ export const OrderModel = {
     return getTenantPool(db.rows[0].db_name);
   },
 
-  getOrderById: async (db, order_id, user_id) => {
-    const res = await db.query(
-      `SELECT * FROM tbl_master_orders
-       WHERE order_id=$1 AND user_id=$2`,
-      [order_id, user_id]
-    );
-    return res.rows[0];
-  },
+ getOrderById: async (db, order_no, user_id) => {
+  const res = await db.query(
+    `SELECT * FROM tbl_master_orders
+     WHERE order_no = $1 AND user_id = $2`,
+    [order_no, user_id]
+  );
+  return res.rows[0];
+},
+
 
   getOrderItems: async (db, order_id) => {
     const res = await db.query(

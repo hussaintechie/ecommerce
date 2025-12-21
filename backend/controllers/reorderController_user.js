@@ -1,28 +1,28 @@
 import { OrderModel } from "../models/reorderModel_user.js";
 import { CartModel } from "../models/cartModel_user.js";
-import { normalizeOrderId } from "../utils/normalizeOrderId.js";
 
 export const reorder = async (req, res) => {
   try {
     const user_id = req.user.user_id;
     const register_id = req.user.register_id;
 
-    const rawOrderId = req.body.order_id;
-    const order_id = normalizeOrderId(rawOrderId);
+    // 🔑 order_no from frontend (ORD0043)
+    const order_no = req.body.order_id;
 
-    if (!order_id) {
+    if (!order_no) {
       return res.status(400).json({
         status: 0,
         message: "Invalid order reference",
       });
     }
 
+    // 🔑 Resolve tenant DB
     const tenantDB = await OrderModel.getTenantDB(register_id);
 
-    // 1️⃣ Verify order belongs to user
+    // 1️⃣ Get order using order_no + user_id
     const order = await OrderModel.getOrderById(
       tenantDB,
-      order_id,
+      order_no,
       user_id
     );
 
@@ -33,6 +33,9 @@ export const reorder = async (req, res) => {
       });
     }
 
+    // ✅ REAL numeric order_id
+    const order_id = order.order_id;
+
     // 2️⃣ Get order items
     const items = await OrderModel.getOrderItems(tenantDB, order_id);
 
@@ -40,7 +43,7 @@ export const reorder = async (req, res) => {
     let skipped = 0;
 
     for (const item of items) {
-      // 3️⃣ Product existence check ONLY
+      // 3️⃣ Check product still exists
       const product = await OrderModel.getActiveProduct(
         tenantDB,
         item.product_id
@@ -51,7 +54,7 @@ export const reorder = async (req, res) => {
         continue;
       }
 
-      // 4️⃣ Check cart
+      // 4️⃣ Add / reset cart
       const cartRes = await CartModel.checkCartItem(
         tenantDB,
         user_id,
@@ -59,7 +62,7 @@ export const reorder = async (req, res) => {
       );
 
       if (cartRes.rowCount > 0) {
-        // ✅ RESET quantity (NOT ADD)
+        // reset qty
         await CartModel.setQuantity(
           tenantDB,
           cartRes.rows[0].cart_id,
