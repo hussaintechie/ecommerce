@@ -244,16 +244,8 @@ export const createitmfile = async (req, res) => {
 };
 
 export const orderdatas = async (req, res) => {
-  //   {
-  // "register_id" :1,
-  // "limit" :20,
-  // "offset" :0,
-  // "searchtxt":"hai",
-  // "fromdate":"2025-01-02",
-  // "todate":"2025-11-30"
-  // } api request
   try {
-    const { limit = 20, offset = 0, searchtxt = "" } = req.body;
+    const { limit = 10, offset = 0 } = req.body;
     const register_id = req.user.register_id;
 
     if (!register_id) {
@@ -263,40 +255,46 @@ export const orderdatas = async (req, res) => {
       });
     }
 
-    // Get Customer DB name (tenant)
+    // 🔹 GET TENANT DB NAME
     const tenantQuery = `
       SELECT db_name 
       FROM tbl_tenant_databases 
       WHERE register_id = $1
     `;
-
     const result = await pool.query(tenantQuery, [register_id]);
 
     if (result.rows.length === 0) {
-      return res.status(400).json({ status: 0, message: "Store not found" });
+      return res.status(400).json({
+        status: 0,
+        message: "Store not found",
+      });
     }
 
+    // 🔹 GET TENANT DB CONNECTION
     const tenantDB = getTenantPool(result.rows[0].db_name);
 
-    // Call model function
-    const orderdatares = await productmodel.orderdataget(
+    // 🔹 CALL MODEL
+    const response = await productmodel.orderdataget(
       tenantDB,
       register_id,
       limit,
-      offset,
-      searchtxt
+      offset
     );
 
-    return res.status(200).json(orderdatares);
-  } catch (err) {
-    console.error("Order data get Error:", err);
+    return res.status(200).json(response);
+
+  } catch (error) {
+    console.error("orderdatas error:", error);
     return res.status(500).json({
       status: 0,
-      message: "Server Error",
-      error: err.message,
+      message: "Order fetch failed",
+      error: error.message,
     });
   }
 };
+
+
+
 export const submitorder = async (req, res) => {
   let tenantDB;
 
@@ -304,150 +302,76 @@ export const submitorder = async (req, res) => {
     const {
       address_delivery,
       total_amount,
-      item_total,
-      handling_fee, // ✅ ADD
-      delivery_fee, // ✅ ADD
+      handling_fee,
+      delivery_fee,
       order_status,
       delivery_id,
-      delivery_slot,
       payment_status,
       payment_method,
       razorpay_payment_id,
       razorpay_order_id,
       razorpay_signature,
       items_details,
+      delivery_start,   // ✅ already local string
+      delivery_end
     } = req.body;
+
+    if (!delivery_start) {
+      return res.json({ status: 0, message: "Delivery time required" });
+    }
 
     const register_id = req.user.register_id;
     const user_id = req.user.user_id;
-
-    /* ---------------- VALIDATIONS ---------------- */
-
-    if (!register_id) {
-      return res.status(400).json({ status: 0, message: "Store ID required" });
-    }
-
-    if (!items_details || items_details.length === 0) {
-      return res.status(400).json({
-        status: 0,
-        message: "Product Details required",
-      });
-    }
-
-    if (payment_method === "Online") {
-      const isValid = isValidRazorpaySignature(
-        razorpay_order_id,
-        razorpay_payment_id,
-        razorpay_signature
-      );
-
-      if (!isValid) {
-        return res.status(400).json({
-          status: 0,
-          message: "Invalid Razorpay signature",
-        });
-      }
-    }
-
-    /* ---------------- TENANT DB ---------------- */
 
     const t = await pool.query(
       "SELECT db_name FROM tbl_tenant_databases WHERE register_id=$1",
       [register_id]
     );
 
-    if (t.rows.length === 0) {
-      return res.status(400).json({
-        status: 0,
-        message: "Store not found",
-      });
-    }
-
     tenantDB = getTenantPool(t.rows[0].db_name);
-
-    /* ---------------- START TRANSACTION ---------------- */
-
-    await tenantDB.query("BEGIN");
-
-    /* ---------------- CREATE ORDER ---------------- */
 
     const orderdatares = await productmodel.ordersubmit(
       tenantDB,
-
       user_id,
       address_delivery,
       total_amount,
-      handling_fee, // ✅ FIXED
-      delivery_fee, // ✅ FIXED
+      handling_fee,
+      delivery_fee,
+      delivery_start,   // ✅ STORE AS-IS
+      delivery_end,
       order_status,
       delivery_id,
       payment_status,
-      items_details,
-      delivery_slot
+      payment_method,          // ✅
+  razorpay_payment_id,     // ✅
+  razorpay_order_id,       // ✅
+  razorpay_signature,  
+      items_details
     );
+if (delivery_start == "Immediate") {
+  return res.status(400).json({
+    status: 0,
+    message: "Delivery end time missing",
+  });
+}
 
-    // 🚨 CRITICAL CHECK
-    if (!orderdatares || orderdatares.status !== 1 || !orderdatares.order_id) {
-      await tenantDB.query("ROLLBACK");
-      return res.status(500).json({
-        status: 0,
-        message: "Order creation failed",
-        error: orderdatares?.error || "Unknown error",
-      });
+    if (!orderdatares || orderdatares.status !== 1) {
+      return res.status(500).json({ status: 0, message: "Order creation failed" });
     }
-
-    const newOrderId = orderdatares.order_id;
-
-    /* ---------------- INSERT PAYMENT ---------------- */
-
-    const externalPayId = razorpay_payment_id || "COD";
-    const transaction_id =
-      payment_method === "Online" ? razorpay_payment_id : null;
-
-    await tenantDB.query(
-      `
-      INSERT INTO tbl_master_payment
-      (order_id, transaction_id, method, external_payment_id, status)
-      VALUES ($1, $2, $3, $4, $5)
-      `,
-      [
-        newOrderId,
-        transaction_id,
-        payment_method,
-        externalPayId,
-        payment_status,
-      ]
-    );
-
-    /* ---------------- COMMIT ---------------- */
-
-    await tenantDB.query("COMMIT");
 
     return res.status(200).json({
       status: 1,
       message: "Order submitted successfully",
-      order_no: orderdatares.order_no,
-      order_id: newOrderId,
+      order_id: orderdatares.order_id,
     });
+
   } catch (err) {
-    console.error("Order Submit Error:", err);
-
-    // rollback only if transaction started
-    if (tenantDB) {
-      try {
-        await tenantDB.query("ROLLBACK");
-      } catch (e) {
-        console.error("Rollback failed:", e);
-      }
-    }
-
-    return res.status(500).json({
-      status: 0,
-      message: "Server Error",
-      error: err.message,
-    });
+    console.error(err);
+    return res.status(500).json({ status: 0, message: "Server Error" });
   }
 };
+
+
 
 export const allcatedetails = async (req, res) => {
   // {

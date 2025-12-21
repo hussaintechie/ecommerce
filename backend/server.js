@@ -11,6 +11,7 @@ import cartRoutes_user from "./routes/cartRoutes_user.js";
 import paymentRoutes from "./routes/paymentRoutes.js";
 import reorderRoutes_user from "./routes/reorderRoutes_user.js";
 import trackorderRoutes_user from "./routes/trackorderRoutes_user.js";
+import userRoutes from "./routes/userRoutes.js"
 
 import dotenv from "dotenv";
 dotenv.config();
@@ -18,7 +19,7 @@ dotenv.config();
 const app = express();
 app.use(
   cors({
-    origin: "http://localhost:5173",
+    origin: true, // allow all origins (DEV only)
     credentials: true,
   })
 );
@@ -32,6 +33,7 @@ app.use("/auth", authRoutes);
 app.use("/fuser", favoriteRoutes_user);
 app.use("/puser", profileRoutes_user);
 app.use("/cuser", cartRoutes_user);
+app.use("/usercustomer",userRoutes)
 
 app.use("/product", productRouter);
 app.use("/customer", customerRoutes);
