@@ -11,7 +11,8 @@ import cartRoutes_user from "./routes/cartRoutes_user.js";
 import paymentRoutes from "./routes/paymentRoutes.js";
 import reorderRoutes_user from "./routes/reorderRoutes_user.js";
 import trackorderRoutes_user from "./routes/trackorderRoutes_user.js";
-import userRoutes from "./routes/userRoutes.js"
+import userRoutes from "./routes/userRoutes.js";
+import invoiceRoutes from "./routes/invoiceRouter.js"
 
 import dotenv from "dotenv";
 dotenv.config();
@@ -28,6 +29,7 @@ app.use(express.json());
 app.use("/api/payment", paymentRoutes);
 app.use("/ruser", reorderRoutes_user);
 app.use("/tuser", trackorderRoutes_user);
+app.use("/invoice",invoiceRoutes) 
 
 app.use("/auth", authRoutes);
 app.use("/fuser", favoriteRoutes_user);

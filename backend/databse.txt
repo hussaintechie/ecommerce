@@ -11,6 +11,9 @@ CREATE TABLE tbl_login (
     email VARCHAR(255) UNIQUE NOT NULL,
     password VARCHAR(255),
     otp VARCHAR(6),
+    added_by VARCHAR(26),
+    name VARCHAR(26),
+    phone VARCHAR(26),
     user_role VARCHAR(10) CHECK (user_role IN ('admin','user')) NOT NULL DEFAULT 'user',
     is_first_login BOOLEAN DEFAULT TRUE,
     

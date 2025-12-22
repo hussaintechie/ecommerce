@@ -130,10 +130,9 @@ const orderdataget = async (tenantDB, store_id, limit, offset, searchtxt) => {
   t.name,
 
   -- ✅ ITEM COUNT
-  COUNT(i.ord_trnid) AS item_count,
+ COALESCE(SUM(i.product_qty), 0) AS item_count
 
-  TO_CHAR(r.created_at, 'YYYY-MM-DD') AS date,
-  TO_CHAR(r.created_at, 'HH12:MI AM') AS time
+  
 
 FROM tbl_master_orders r
 
@@ -433,55 +432,63 @@ const singleorddetail = async (tenantDB, store_id, orderid) => {
       WHERE itm.order_id = $1
     `;
 
-    /* ---------------- BILL + PAYMENT ---------------- */
+    /* ---------------- ORDER DETAILS ---------------- */
     const orderothrsql = `
       SELECT
         ord.total_amount,
         ord.handling_fee,
         ord.delivery_fee,
-       
-        ord.total_amount,
+        ord.order_no,
+        t.name AS customer_name,
+        t.phone AS customer_phone,
         ord.address_delivery AS address,
-        pay.method AS pay_method,
+        COALESCE(pay.method, 'COD') AS pay_method,
         TO_CHAR(ord.created_at, 'DD-Mon-YYYY') AS pay_date
       FROM tbl_master_orders ord
-      INNER JOIN tbl_master_payment pay
+      LEFT JOIN tbl_master_payment pay
         ON pay.order_id = ord.order_id
+      INNER JOIN tbl_address t
+        ON t.address_id = (
+          SELECT address_id
+          FROM tbl_address
+          WHERE user_id = ord.user_id
+          ORDER BY address_id DESC
+          LIMIT 1
+        )
       WHERE ord.order_id = $1
     `;
 
-    const itmresult = await tenantDB.query(userorderitmsql, [orderid]);
-    const otherresult = await tenantDB.query(orderothrsql, [orderid]);
+    const [itmresult, otherresult] = await Promise.all([
+      tenantDB.query(userorderitmsql, [orderid]),
+      tenantDB.query(orderothrsql, [orderid]),
+    ]);
 
-    let data = {
-      itmdetails: [],
-      address: null,
-      billdetails: {},
-      paydetails: {},
-    };
+    if (otherresult.rows.length === 0) {
+      return { status: 0, message: "Order not found" };
+    }
 
-    /* ITEMS */
-    data.itmdetails = itmresult.rows;
+    const info = otherresult.rows[0];
 
-    /* BILL + PAYMENT */
-    if (otherresult.rows.length > 0) {
-      const info = otherresult.rows[0];
-
-      data.address = info.address;
-
-      data.billdetails = {
-        item_total: Number(info.item_total || 0),
+    const data = {
+      order_no: info.order_no,
+      itmdetails: itmresult.rows,
+      address: info.address,
+      customer: {
+        name: info.customer_name,
+        phone: info.customer_phone,
+      },
+      billdetails: {
         handling_fee: Number(info.handling_fee || 0),
         delivery_fee: Number(info.delivery_fee || 0),
-        discount_amount: Number(info.discount_amount || 0),
         total_amount: Number(info.total_amount || 0),
-      };
-
-      data.paydetails = {
+      },
+      paydetails: {
         pay_mode: info.pay_method,
         pay_date: info.pay_date,
-      };
-    }
+      },
+    };
+
+    console.log("✅ SINGLE ORDER RESPONSE:", data);
 
     return {
       status: 1,
@@ -492,8 +499,8 @@ const singleorddetail = async (tenantDB, store_id, orderid) => {
     console.error("Order fetch error:", error);
     return { status: 0, message: "Order Fetch failed", error };
   }
-  
 };
+
 
 const markOutForDelivery = async (tenantDB, order_id) => {
   const otp = Math.floor(100000 + Math.random() * 900000).toString();
