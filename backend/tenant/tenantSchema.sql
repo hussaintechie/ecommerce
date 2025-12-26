@@ -13,14 +13,9 @@ CREATE TABLE tbl_address (
 
     pincode         VARCHAR(10),
     address_type    VARCHAR(50),
-
     lat             DECIMAL(10,6),
     lng             DECIMAL(10,6),
-<<<<<<< HEAD
-=======
     is_default BOOLEAN DEFAULT false,
->>>>>>> 02e3c1a9004ed324ac8ed4f3119de893522622ec
-
     created_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 CREATE TABLE IF NOT EXISTS tbl_master_categories (
@@ -40,6 +35,9 @@ CREATE TABLE IF NOT EXISTS tbl_master_product (
     quantity INT,
     unit INT,
     thumbnail TEXT,
+    discount_per NUMERIC(5,2) DEFAULT 0,
+    discount_sts SMALLINT DEFAULT 0,
+    itm_spctyp VARCHAR(255) DEFAULT NUll,
     created_at TIMESTAMP DEFAULT NOW()
 );
 CREATE TABLE IF NOT EXISTS unitofmeasure_master (
@@ -84,15 +82,11 @@ CREATE TABLE IF NOT EXISTS tmp_tbl_master_product (
 -- );
 
 
-CREATE TABLE IF NOT EXISTS tbl_master_orders (
-    order_id SERIAL PRIMARY KEY,
-    order_no VARCHAR(20) DEFAULT '',
-=======
+
 CREATE TABLE IF NOT EXISTS tbl_master_orders (
     order_id SERIAL PRIMARY KEY,
     order_no VARCHAR(20) DEFAULT '',
     product_id INT NOT NULL,
->>>>>>> 02e3c1a9004ed324ac8ed4f3119de893522622ec
     user_id INT NOT NULL,
     address_delivery TEXT,
     total_amount NUMERIC(10,2) NOT NULL,
@@ -174,7 +168,9 @@ create table IF NOT EXISTS tbl_master_order_items (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 insert into tbl_rollno_master(prefix ,lastrollid,nodigit) values ('ORD' ,1 ,4);
-=======
+insert into tbl_rollno_master(prefix ,lastrollid,nodigit) values ('FS' ,1 ,4);
+insert into tbl_rollno_master(prefix ,lastrollid,nodigit) values ('PUR' ,1 ,4);
+
 create table tbl_favorites (
 fav_id serial primary key,
 user_id int not null,
@@ -182,5 +178,58 @@ product_id int not null,
 created_at timestamp default now(),
 unique(user_id,product_id)
 
-)
->>>>>>> 02e3c1a9004ed324ac8ed4f3119de893522622ec
+);
+
+create table IF NOT EXISTS tbl_flashsale_header (
+    flsh_trnid SERIAL PRIMARY KEY,
+	register_id INT NOT NULL,
+	flash_no VARCHAR(255),
+	from_datetime TIMESTAMP,
+	to_datetime TIMESTAMP,
+	created_userid INT ,
+	updated_userid INT ,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+	updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+create table IF NOT EXISTS tbl_flashsale_trans (
+    transid SERIAL PRIMARY KEY,
+	flsh_trnid INT NOT NULL,
+    product_id INT NOT NULL,
+    product_rate NUMERIC(10,2) NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+	updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE  if not exists purchase_header (
+    purchaseid SERIAL PRIMARY KEY,
+    purchasedate DATE NOT NULL,
+    purchase_no VARCHAR(250) NOT NULL,
+    storeid INTEGER DEFAULT 0,
+    refrence VARCHAR(250),
+    cansts INTEGER DEFAULT 0,
+    created_at INTEGER DEFAULT 0,
+    updated_at INTEGER DEFAULT 0,
+    create_datetime TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_datetime TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+
+CREATE TABLE if not exists stock_transaction (
+    stocktrnid SERIAL PRIMARY KEY,
+    purchase_id INTEGER NOT NULL,
+    orderid INTEGER DEFAULT 0,
+    purchase_date DATE NOT NULL,
+    instoreid INTEGER DEFAULT 0,
+    outstoreid INTEGER DEFAULT 0,
+    itmid INTEGER NOT NULL,
+    itmname VARCHAR(250),
+    unitid INTEGER DEFAULT 0,
+    stockqty INTEGER DEFAULT 0,
+    rate NUMERIC(10,2) DEFAULT 0,
+    value NUMERIC(10,2) DEFAULT 0,
+    currentstock INTEGER DEFAULT 0,
+    itmcandel INTEGER DEFAULT 0,
+    canordersts INTEGER DEFAULT 0
+);
+
