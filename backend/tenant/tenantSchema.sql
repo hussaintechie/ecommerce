@@ -59,7 +59,9 @@ CREATE TABLE IF NOT EXISTS tmp_tbl_master_product (
     price NUMERIC(10,2),
     mrp NUMERIC(10,2),
     quantity INT,
-    unit VARCHAR(50)
+    unit VARCHAR(50),
+	product_status BOOLEAN,
+	stock int
 );
 CREATE TABLE IF NOT EXISTS tbl_master_orders (
     order_id SERIAL PRIMARY KEY,
@@ -71,6 +73,9 @@ CREATE TABLE IF NOT EXISTS tbl_master_orders (
     order_status VARCHAR(20) DEFAULT 'new',
     delivery_id INT,
     payment_status VARCHAR(10) DEFAULT 'pending',
+   coupon_code VARCHAR(50),
+   coupon_discount NUMERIC(10,2) DEFAULT 0,
+   first_order_discount NUMERIC(10,2) DEFAULT 0,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 CREATE TABLE IF NOT EXISTS tbl_master_payment (
@@ -131,7 +136,7 @@ product_id int not null,
 created_at timestamp default now(),
 unique(user_id,product_id)
 
-)
+);
 CREATE TABLE IF NOT EXISTS tbl_rollno_master (
     rollid SERIAL PRIMARY KEY,
     prefix VARCHAR(50) NOT NULL,
@@ -156,12 +161,7 @@ create table IF NOT EXISTS tbl_master_order_items (
 
 
 
-alter table tbl_master_product
-add column product_status BOOLEAN 
 
-
-alter table tbl_master_product
-add column stock int
 
 CREATE TABLE tbl_order_tracking (
   id SERIAL PRIMARY KEY,
@@ -171,9 +171,25 @@ CREATE TABLE tbl_order_tracking (
 );
 
 
+CREATE TABLE tbl_coupons (
+  coupon_id SERIAL PRIMARY KEY,
+  coupon_code VARCHAR(50) UNIQUE NOT NULL,
+  discount_type VARCHAR(10) CHECK (discount_type IN ('PERCENT','FLAT')),
+  discount_value NUMERIC(10,2) NOT NULL,
+  min_order_value NUMERIC(10,2) DEFAULT 0,
+  max_discount NUMERIC(10,2),
+  expiry_date DATE,
+  is_active BOOLEAN DEFAULT true,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+CREATE TABLE tbl_coupon_usage (
+  usage_id SERIAL PRIMARY KEY,
+  coupon_id INT REFERENCES tbl_coupons(coupon_id),
+  user_id INT,
+  order_id INT,
+  used_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE (coupon_id, user_id)
+);
 
-ALTER TABLE tbl_master_orders
-ADD COLUMN delivery_otp VARCHAR(6),
-ADD COLUMN otp_verified BOOLEAN DEFAULT false;
-ALTER TABLE tbl_master_orders
-ADD COLUMN otp_generated_at timestamp
+
+

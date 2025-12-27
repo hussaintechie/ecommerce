@@ -3,7 +3,7 @@ import XLSX from "xlsx";
 import { getTenantPool } from "../config/tenantDB.js";
 import productmodel from "../models/productModel.js";
 import crypto from "crypto";
-
+import { io } from "../server.js";
 // -----------------------------
 // Razorpay Signature Validation
 // -----------------------------
@@ -346,7 +346,11 @@ export const submitorder = async (req, res) => {
   razorpay_payment_id,     // ✅
   razorpay_order_id,       // ✅
   razorpay_signature,  
-      items_details
+      items_details,
+       req.body.coupon_code,
+  req.body.coupon_discount,
+  req.body.first_order_discount,
+  req.body.coupon_id
     );
 if (delivery_start == "Immediate") {
   return res.status(400).json({
@@ -354,10 +358,16 @@ if (delivery_start == "Immediate") {
     message: "Delivery end time missing",
   });
 }
+// 🔔 REAL-TIME NOTIFICATION
 
     if (!orderdatares || orderdatares.status !== 1) {
       return res.status(500).json({ status: 0, message: "Order creation failed" });
     }
+   io.emit("new-order", {
+  order_id: orderdatares.order_id,
+  register_id,
+  total_amount
+});
 
     return res.status(200).json({
       status: 1,

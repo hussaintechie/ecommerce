@@ -195,7 +195,12 @@ const ordersubmit = async (
   razorpay_payment_id,     // ✅ ADD
   razorpay_order_id,       // ✅ ADD
   razorpay_signature, 
-  items_details
+  items_details,
+  coupon_code = null,
+  coupon_discount = 0,
+  first_order_discount = 0,
+  coupon_id = null
+
 ) => {
   try {
     await tenantDB.query("BEGIN");
@@ -210,6 +215,28 @@ const ordersubmit = async (
     const nodigit = rollnores.rows[0]?.nodigit ?? 4;
 
     const order_no = `${prefix}${String(lastId + 1).padStart(nodigit, "0")}`;
+    // save coupon & first order discount
+await tenantDB.query(
+  `
+  UPDATE tbl_master_orders
+  SET coupon_code=$1,
+      coupon_discount=$2,
+      first_order_discount=$3
+  WHERE order_id=$4
+  `,
+  [coupon_code, coupon_discount, first_order_discount, order_id]
+);
+
+// mark coupon used
+if (coupon_id) {
+  await CouponModel.markCouponUsed(
+    tenantDB,
+    coupon_id,
+    user_id,
+    order_id
+  );
+}
+
 
     /* --------- INSERT ORDER --------- */
    const orderRes = await tenantDB.query(
@@ -315,7 +342,15 @@ await tenantDB.query(
     razorpay_order_id || null        // ✅ external_payment_id
   ]
 );
-
+ if (coupon_id) {
+      await tenantDB.query(
+        `
+        INSERT INTO tbl_coupon_usage (coupon_id, user_id, order_id)
+        VALUES ($1,$2,$3)
+        `,
+        [coupon_id, user_id, order_id]
+      );
+    }
     /* --------- ORDER TRACKING --------- */
     await tenantDB.query(
       `
