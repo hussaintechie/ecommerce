@@ -215,27 +215,10 @@ const ordersubmit = async (
     const nodigit = rollnores.rows[0]?.nodigit ?? 4;
 
     const order_no = `${prefix}${String(lastId + 1).padStart(nodigit, "0")}`;
-    // save coupon & first order discount
-await tenantDB.query(
-  `
-  UPDATE tbl_master_orders
-  SET coupon_code=$1,
-      coupon_discount=$2,
-      first_order_discount=$3
-  WHERE order_id=$4
-  `,
-  [coupon_code, coupon_discount, first_order_discount, order_id]
-);
+    
 
 // mark coupon used
-if (coupon_id) {
-  await CouponModel.markCouponUsed(
-    tenantDB,
-    coupon_id,
-    user_id,
-    order_id
-  );
-}
+
 
 
     /* --------- INSERT ORDER --------- */
@@ -280,6 +263,52 @@ if (coupon_id) {
 );
 
     const order_id = orderRes.rows[0].order_id;
+    await tenantDB.query(
+  `
+  UPDATE tbl_master_orders
+  SET coupon_code = $1,
+      coupon_discount = $2,
+      first_order_discount = $3
+  WHERE order_id = $4
+  `,
+  [
+    coupon_code,
+    coupon_discount,
+    first_order_discount,
+    order_id
+  ]
+);
+
+// =====================
+// MARK COUPON USED
+// =====================
+console.log("Coupon Data:", {
+  coupon_id,
+  coupon_code,
+  coupon_discount
+});
+
+let final_coupon_id = null;
+
+if (coupon_code) {
+  const res = await tenantDB.query(
+    `SELECT coupon_id FROM tbl_coupons WHERE coupon_code = $1`,
+    [coupon_code]
+  );
+
+  if (res.rowCount > 0) {
+    final_coupon_id = res.rows[0].coupon_id;
+  }
+}
+
+if (final_coupon_id) {
+  await tenantDB.query(
+    `INSERT INTO tbl_coupon_usage (coupon_id, user_id, order_id)
+     VALUES ($1, $2, $3)`,
+    [final_coupon_id, user_id, order_id]
+  );
+}
+
 
     /* --------- UPDATE ROLL --------- */
     await tenantDB.query(
@@ -342,15 +371,7 @@ await tenantDB.query(
     razorpay_order_id || null        // ✅ external_payment_id
   ]
 );
- if (coupon_id) {
-      await tenantDB.query(
-        `
-        INSERT INTO tbl_coupon_usage (coupon_id, user_id, order_id)
-        VALUES ($1,$2,$3)
-        `,
-        [coupon_id, user_id, order_id]
-      );
-    }
+
     /* --------- ORDER TRACKING --------- */
     await tenantDB.query(
       `
@@ -457,40 +478,51 @@ const singleorddetail = async (tenantDB, store_id, orderid) => {
     /* ---------------- ITEMS ---------------- */
     const userorderitmsql = `
       SELECT 
-        itm.product_name AS itmname, 
-        itm.product_amount AS itmamt,
-        itm.product_qty AS qty,
-        um.unitname AS unit
-      FROM tbl_master_order_items itm
-      INNER JOIN unitofmeasure_master um  
-        ON itm.product_unit = um.unitid 
-      WHERE itm.order_id = $1
+  itm.product_name AS itmname, 
+  itm.product_rate AS price,
+  itm.product_qty AS qty,
+  itm.product_amount AS total,
+  um.unitname AS unit
+FROM tbl_master_order_items itm
+INNER JOIN unitofmeasure_master um  
+  ON itm.product_unit = um.unitid
+WHERE itm.order_id = $1
+
     `;
 
     /* ---------------- ORDER DETAILS ---------------- */
     const orderothrsql = `
-      SELECT
-        ord.total_amount,
-        ord.handling_fee,
-        ord.delivery_fee,
-        ord.order_no,
-        t.name AS customer_name,
-        t.phone AS customer_phone,
-        ord.address_delivery AS address,
-        COALESCE(pay.method, 'COD') AS pay_method,
-        TO_CHAR(ord.created_at, 'DD-Mon-YYYY') AS pay_date
-      FROM tbl_master_orders ord
-      LEFT JOIN tbl_master_payment pay
-        ON pay.order_id = ord.order_id
-      INNER JOIN tbl_address t
-        ON t.address_id = (
-          SELECT address_id
-          FROM tbl_address
-          WHERE user_id = ord.user_id
-          ORDER BY address_id DESC
-          LIMIT 1
-        )
-      WHERE ord.order_id = $1
+     SELECT
+  ord.total_amount,
+  ord.handling_fee,
+  ord.delivery_fee,
+  ord.coupon_discount AS discount_amount,
+  ord.coupon_code,
+  ord.order_no,
+  t.name AS customer_name,
+  t.phone AS customer_phone,
+  ord.address_delivery AS address,
+  COALESCE(pay.method, 'COD') AS pay_method,
+  TO_CHAR(ord.created_at, 'DD-Mon-YYYY') AS pay_date,
+  SUM(itm.product_amount) AS item_total
+FROM tbl_master_orders ord
+INNER JOIN tbl_master_order_items itm 
+  ON itm.order_id = ord.order_id
+LEFT JOIN tbl_master_payment pay 
+  ON pay.order_id = ord.order_id
+INNER JOIN tbl_address t 
+  ON t.address_id = (
+    SELECT address_id
+    FROM tbl_address
+    WHERE user_id = ord.user_id
+    ORDER BY address_id DESC
+    LIMIT 1
+  )
+WHERE ord.order_id = $1
+GROUP BY 
+  ord.order_id, t.name, t.phone, pay.method;
+
+
     `;
 
     const [itmresult, otherresult] = await Promise.all([
@@ -512,11 +544,15 @@ const singleorddetail = async (tenantDB, store_id, orderid) => {
         name: info.customer_name,
         phone: info.customer_phone,
       },
-      billdetails: {
-        handling_fee: Number(info.handling_fee || 0),
-        delivery_fee: Number(info.delivery_fee || 0),
-        total_amount: Number(info.total_amount || 0),
-      },
+     billdetails: {
+  item_total: Number(info.item_total || 0),
+  handling_fee: Number(info.handling_fee || 0),
+  delivery_fee: Number(info.delivery_fee || 0),
+  discount: Number(info.discount_amount || 0),
+  total_amount: Number(info.total_amount || 0),
+  coupon_code: info.coupon_code || null
+},
+
       paydetails: {
         pay_mode: info.pay_method,
         pay_date: info.pay_date,

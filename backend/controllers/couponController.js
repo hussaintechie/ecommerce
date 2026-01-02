@@ -46,14 +46,19 @@ export const createCoupon = async (req, res) => {
 export const getCoupons = async (req, res) => {
   try {
     const tenantDB = await CouponModel.getTenantDB(req.user.register_id);
-    const result = await CouponModel.getCoupons(tenantDB);
+
+    const result = await CouponModel.getCoupons(
+      tenantDB,
+      req.user.user_id
+    );
 
     return res.json({
       status: 1,
-      data: result.rows,
+      data: result.rows
     });
 
   } catch (err) {
+    console.error(err);
     return res.status(500).json({ status: 0, message: err.message });
   }
 };

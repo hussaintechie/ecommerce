@@ -36,6 +36,7 @@ CREATE TABLE IF NOT EXISTS tbl_master_product (
     mrp NUMERIC(10,2),
     quantity INT,
     unit INT,
+    lowstqty INTEGER DEFAULT 0,
     thumbnail TEXT,
     created_at TIMESTAMP DEFAULT NOW()
 );
@@ -193,3 +194,12 @@ CREATE TABLE tbl_coupon_usage (
 
 
 
+CREATE TABLE tbl_delivery_partner (
+  driver_id SERIAL PRIMARY KEY,
+  full_name VARCHAR(150),
+  mobile VARCHAR(15),
+  aadhar_no VARCHAR(20),
+  address TEXT,
+  status SMALLINT DEFAULT 1, -- 1 = active, 0 = inactive
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);

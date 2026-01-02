@@ -37,11 +37,31 @@ export const CouponModel = {
   },
 
   // 📋 List coupons (ADMIN)
-  getCoupons: async (tenantDB) => {
-    return tenantDB.query(
-      `SELECT * FROM tbl_coupons ORDER BY created_at DESC`
-    );
-  },
+  // ✅ List coupons with usage info (per user)
+getCoupons: async (tenantDB, user_id) => {
+  return tenantDB.query(`
+    SELECT 
+      c.coupon_id,
+      c.coupon_code,
+      c.discount_type,
+      c.discount_value,
+      c.min_order_value,
+      c.max_discount,
+      c.expiry_date,
+      c.is_active,
+      CASE 
+        WHEN cu.user_id IS NOT NULL THEN true
+        ELSE false
+      END AS is_used
+    FROM tbl_coupons c
+    LEFT JOIN tbl_coupon_usage cu 
+      ON cu.coupon_id = c.coupon_id 
+     AND cu.user_id = $1
+    WHERE c.is_active = true
+    ORDER BY c.created_at DESC
+  `, [user_id]);
+},
+
 
   // 🛒 Apply coupon (CART)
   applyCoupon: async (tenantDB, user_id, coupon_code, cartTotal) => {

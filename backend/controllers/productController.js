@@ -544,6 +544,7 @@ export const singleorddetail = async (req, res) => {
   // }
   try {
     const { orderid } = req.body;
+    
     const register_id = req.user.register_id;
     if (!register_id) {
       return res.status(400).json({
@@ -720,5 +721,49 @@ export const trackOrder = async (req, res) => {
       message: "Server error",
       error: err.message,
     });
+  }
+};
+export const getDeliveryOrderDetails = async (req, res) => {
+  try {
+    const { orderId } = req.params;
+    const register_id = req.user.register_id;
+
+    if (!orderId) {
+      return res.status(400).json({ status: 0, message: "Order ID required" });
+    }
+
+    const tenantRes = await pool.query(
+      `SELECT db_name FROM tbl_tenant_databases WHERE register_id = $1`,
+      [register_id]
+    );
+
+    if (!tenantRes.rowCount) {
+      return res.status(404).json({ status: 0, message: "Store not found" });
+    }
+
+    const tenantDB = getTenantPool(tenantRes.rows[0].db_name);
+
+    const query = `
+      SELECT 
+        o.order_id,
+        a.name,
+        a.phone,
+        a.full_address
+      FROM tbl_master_orders o
+      JOIN tbl_address a ON a.user_id = o.user_id
+      WHERE o.user_id = $1
+    `;
+
+    const result = await tenantDB.query(query, [orderId]);
+
+    if (!result.rowCount) {
+      return res.status(404).json({ status: 0, message: "Order not found" });
+    }
+
+    return res.json({ status: 1, data: result.rows[0] });
+
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ status: 0, message: "Server error" });
   }
 };
