@@ -1,12 +1,26 @@
 import pool from "../config/masterDB.js";
 import XLSX from "xlsx";
 import { getTenantPool } from "../config/tenantDB.js";
-import productmodel from "../models/productModel.js"
+import productmodel from "../models/productModel.js";
+import crypto from "crypto";
+import { io } from "../server.js";
+// -----------------------------
+// Razorpay Signature Validation
+// -----------------------------
+function isValidRazorpaySignature(orderId, paymentId, signature) {
+  const body = `${orderId}|${paymentId}`;
+
+  const expected = crypto
+    .createHmac("sha256", process.env.RAZORPAY_SECRET)
+    .update(body)
+    .digest("hex");
+
+  return expected === signature;
+}
 
 export const addCategoryProduct = async (req, res) => {
   try {
     const {
-     
       category_name,
       title,
       description,
@@ -14,9 +28,9 @@ export const addCategoryProduct = async (req, res) => {
       mrp,
       quantity,
       thumbnail,
-      images
+      images,
     } = req.body;
-    const register_id=req.user.register_id
+    const register_id = req.user.register_id;
 
     if (
       !register_id ||
@@ -81,7 +95,6 @@ export const addCategoryProduct = async (req, res) => {
       category_id: categoryId,
       product_id: productId,
     });
-
   } catch (err) {
     console.error("Add Category+Product Error:", err);
     res.status(500).json({ error: err.message });
@@ -89,7 +102,6 @@ export const addCategoryProduct = async (req, res) => {
 };
 
 export const neweditcategory = async (req, res) => {
-
   //  {
   //     "category_name":"FOOD Items76",
   //     "register_id" : 1,
@@ -99,8 +111,8 @@ export const neweditcategory = async (req, res) => {
   //} API REQUEST PARAMETER
 
   try {
-    const {  category_name, sts, mode, catid } = req.body;
-    const register_id=req.user.register_id
+    const { category_name, sts, mode, catid } = req.body;
+    const register_id = req.user.register_id;
 
     // VALIDATION
     if (!register_id || !category_name) {
@@ -143,10 +155,11 @@ export const neweditcategory = async (req, res) => {
     );
 
     return res.status(200).json(categoryResponse);
-
   } catch (err) {
     console.error("Add Category Error:", err);
-    return res.status(500).json({ status: 0, message: "Server Error", error: err.message });
+    return res
+      .status(500)
+      .json({ status: 0, message: "Server Error", error: err.message });
   }
 };
 
@@ -154,13 +167,12 @@ export const createitmfile = async (req, res) => {
   //file=excel file
   //register_id =2  request api
 
-
   try {
     if (!req.file) {
       return res.status(400).json({ status: 0, message: "File not uploaded" });
     }
 
-    const register_id=req.user.register_id
+    const register_id = req.user.register_id;
 
     // Read Excel buffer
     const workbook = XLSX.read(req.file.buffer, { type: "buffer" });
@@ -184,7 +196,7 @@ export const createitmfile = async (req, res) => {
 
     const tenantDB = getTenantPool(result.rows[0].db_name);
 
-    console.log("Excel Data:", rows);
+   
 
     // Prepare VALUES query
     let values = [];
@@ -204,7 +216,9 @@ export const createitmfile = async (req, res) => {
     }
 
     if (values.length === 0) {
-      return res.status(400).json({ status: 0, message: "Excel contains no data" });
+      return res
+        .status(400)
+        .json({ status: 0, message: "Excel contains no data" });
     }
 
     await tenantDB.query("DELETE FROM tmp_tbl_master_product");
@@ -219,30 +233,20 @@ export const createitmfile = async (req, res) => {
     const blkuploadres = await productmodel.bulkuploaditm(tenantDB, fullqry);
 
     return res.status(200).json(blkuploadres);
-
   } catch (err) {
     console.error("Upload Items Error:", err);
     return res.status(500).json({
       status: 0,
       message: "Server Error",
-      error: err.message
+      error: err.message,
     });
   }
 };
 
 export const orderdatas = async (req, res) => {
-
-//   {
-// "register_id" :1,
-// "limit" :20,
-// "offset" :0,
-// "searchtxt":"hai",
-// "fromdate":"2025-01-02",
-// "todate":"2025-11-30"
-// } api request
   try {
-    const {  limit = 20, offset = 0, searchtxt = '' } = req.body;
-    const register_id=req.user.register_id
+    const { limit = 10, offset = 0 } = req.body;
+    const register_id = req.user.register_id;
 
     if (!register_id) {
       return res.status(400).json({
@@ -251,38 +255,40 @@ export const orderdatas = async (req, res) => {
       });
     }
 
-    // Get Customer DB name (tenant)
+    // 🔹 GET TENANT DB NAME
     const tenantQuery = `
       SELECT db_name 
       FROM tbl_tenant_databases 
       WHERE register_id = $1
     `;
-
     const result = await pool.query(tenantQuery, [register_id]);
 
     if (result.rows.length === 0) {
-      return res.status(400).json({ status: 0, message: "Store not found" });
+      return res.status(400).json({
+        status: 0,
+        message: "Store not found",
+      });
     }
 
+    // 🔹 GET TENANT DB CONNECTION
     const tenantDB = getTenantPool(result.rows[0].db_name);
 
-    // Call model function
-    const orderdatares = await productmodel.orderdataget(
+    // 🔹 CALL MODEL
+    const response = await productmodel.orderdataget(
       tenantDB,
       register_id,
       limit,
-      offset,
-      searchtxt
+      offset
     );
 
-    return res.status(200).json(orderdatares);
+    return res.status(200).json(response);
 
-  } catch (err) {
-    console.error("Order data get Error:", err);
+  } catch (error) {
+    console.error("orderdatas error:", error);
     return res.status(500).json({
       status: 0,
-      message: "Server Error",
-      error: err.message,
+      message: "Order fetch failed",
+      error: error.message,
     });
   }
 };
@@ -290,100 +296,103 @@ export const orderdatas = async (req, res) => {
 
 
 export const submitorder = async (req, res) => {
-
-// {
-//   "register_id": 1,
-//   "product_id": 12,
-//   "user_id": 3,
-//   "address_delivery": "72/1 ,siruvadi",
-//   "total_amount": 238,
-//   "order_status": "Pending",
-//   "delivery_id": 2,
-//   "payment_status": "Failed",
-//   "items_details": [
-//     {
-//       "product_id": 2,
-//       "product_name": "Test",
-//       "product_qty": 35,
-//       "product_unit": 4,
-//       "product_rate": 46,
-//       "product_amount": 98,
-//       "discount_amt": 56,
-//       "discount_per": 40
-//     },
-//     {
-//       "product_id": 4,
-//       "product_name": "Sample",
-//       "product_qty": 10,
-//       "product_unit": 1,
-//       "product_amount": 98,
-//       "product_rate": 80,
-//       "discount_amt": 10,
-//       "discount_per": 5
-//     }
-//   ]
-// }
+  let tenantDB;
 
   try {
-    const {address_delivery ,total_amount ,order_status ,delivery_id ,payment_status ,items_details} = req.body;
-    const register_id=req.user.register_id
-    const user_id=req.user.user_id
+    const {
+      address_delivery,
+      total_amount,
+      handling_fee,
+      delivery_fee,
+      order_status,
+      delivery_id,
+      payment_status,
+      payment_method,
+      razorpay_payment_id,
+      razorpay_order_id,
+      razorpay_signature,
+      items_details,
+      delivery_start,   // ✅ already local string
+      delivery_end
+    } = req.body;
 
-    if (!register_id) {
-      return res.status(400).json({
-        status: 0,
-        message: "Store ID required",
-      });
-    }
-    if (!items_details) {
-      return res.status(400).json({
-        status: 0,
-        message: "Product Details required",
-      });
-    }
-
-    // Get Customer DB name (tenant)
-    const tenantQuery = `
-      SELECT db_name 
-      FROM tbl_tenant_databases 
-      WHERE register_id = $1
-    `;
-
-    const result = await pool.query(tenantQuery, [register_id]);
-
-    if (result.rows.length === 0) {
-      return res.status(400).json({ status: 0, message: "Store not found" });
+    if (!delivery_start) {
+      return res.json({ status: 0, message: "Delivery time required" });
     }
 
-    const tenantDB = getTenantPool(result.rows[0].db_name);
+    const register_id = req.user.register_id;
+    const user_id = req.user.user_id;
 
-    // Call model function
-    const orderdatares = await productmodel.ordersubmit(tenantDB,register_id,user_id ,address_delivery ,total_amount ,order_status ,delivery_id ,payment_status,items_details);
+    const t = await pool.query(
+      "SELECT db_name FROM tbl_tenant_databases WHERE register_id=$1",
+      [register_id]
+    );
 
-    return res.status(200).json(orderdatares);
+    tenantDB = getTenantPool(t.rows[0].db_name);
+
+    const orderdatares = await productmodel.ordersubmit(
+      tenantDB,
+      user_id,
+      address_delivery,
+      total_amount,
+      handling_fee,
+      delivery_fee,
+      delivery_start,   // ✅ STORE AS-IS
+      delivery_end,
+      order_status,
+      delivery_id,
+      payment_status,
+      payment_method,          // ✅
+  razorpay_payment_id,     // ✅
+  razorpay_order_id,       // ✅
+  razorpay_signature,  
+      items_details,
+       req.body.coupon_code,
+  req.body.coupon_discount,
+  req.body.first_order_discount,
+  req.body.coupon_id
+    );
+if (delivery_start == "Immediate") {
+  return res.status(400).json({
+    status: 0,
+    message: "Delivery end time missing",
+  });
+}
+// 🔔 REAL-TIME NOTIFICATION
+
+    if (!orderdatares || orderdatares.status !== 1) {
+      return res.status(500).json({ status: 0, message: "Order creation failed" });
+    }
+   io.emit("new-order", {
+  order_id: orderdatares.order_id,
+  register_id,
+  total_amount
+});
+
+    return res.status(200).json({
+      status: 1,
+      message: "Order submitted successfully",
+      order_id: orderdatares.order_id,
+    });
 
   } catch (err) {
-    console.error("Order data get Error:", err);
-    return res.status(500).json({
-      status: 0,
-      message: "Server Error",
-      error: err.message,
-    });
+    console.error(err);
+    return res.status(500).json({ status: 0, message: "Server Error" });
   }
 };
 
 
-export const allcatedetails = async (req, res) => {
 
-// {
-//   "register_id": 1,
-//   "mode_fetchorall": 0,
-//   "cate_id": 0
-// }
+export const allcatedetails = async (req, res) => {
+  // {
+  //   "register_id": 1,
+  //   "mode_fetchorall": 0,
+  //   "cate_id": 0
+  // }
 
   try {
-    const { mode_fetchorall, cate_id} = req.body;
-    const register_id=req.user.register_id
+    const { mode_fetchorall, cate_id } = req.body;
+    const register_id = req.user.register_id;
 
     if (!register_id) {
       return res.status(400).json({
@@ -391,7 +400,6 @@ export const allcatedetails = async (req, res) => {
         message: "Store ID required",
       });
     }
-
 
     // Get Customer DB name (tenant)
     const tenantQuery = `
@@ -409,10 +417,14 @@ export const allcatedetails = async (req, res) => {
     const tenantDB = getTenantPool(result.rows[0].db_name);
 
     // Call model function
-    const catedatares = await productmodel.allcatedetails(tenantDB,register_id,mode_fetchorall ,cate_id);
+    const catedatares = await productmodel.allcatedetails(
+      tenantDB,
+      register_id,
+      mode_fetchorall,
+      cate_id
+    );
 
     return res.status(200).json(catedatares);
-
   } catch (err) {
     console.error("Category data get Error:", err);
     return res.status(500).json({
@@ -423,15 +435,14 @@ export const allcatedetails = async (req, res) => {
   }
 };
 export const catitems = async (req, res) => {
-
-// {
-//   "register_id": 1,
-//   "cate_id": 0
-// }
+  // {
+  //   "register_id": 1,
+  //   "cate_id": 0
+  // }
 
   try {
-    const {cate_id} = req.body;
-    const register_id=req.user.register_id
+    const { cate_id } = req.body;
+    const register_id = req.user.register_id;
 
     if (!register_id) {
       return res.status(400).json({
@@ -439,7 +450,6 @@ export const catitems = async (req, res) => {
         message: "Store ID required",
       });
     }
-
 
     // Get Customer DB name (tenant)
     const tenantQuery = `
@@ -457,10 +467,13 @@ export const catitems = async (req, res) => {
     const tenantDB = getTenantPool(result.rows[0].db_name);
 
     // Call model function
-    const catedatares = await productmodel.catitems(tenantDB,register_id ,cate_id);
+    const catedatares = await productmodel.catitems(
+      tenantDB,
+      register_id,
+      cate_id
+    );
 
     return res.status(200).json(catedatares);
-
   } catch (err) {
     console.error("Items data get Error:", err);
     return res.status(500).json({
@@ -655,14 +668,13 @@ export const saveItem = async (req, res) => {
 };
 
 export const getuserorders = async (req, res) => {
-
-// {
-//   "register_id": 1,
-//   "userid": 3
-// }
+  // {
+  //   "register_id": 1,
+  //   "userid": 3
+  // }
   try {
-    const  userid = req.user.user_id;
-    const register_id=req.user.register_id
+    const userid = req.user.user_id;
+    const register_id = req.user.register_id;
 
     if (!register_id) {
       return res.status(400).json({
@@ -677,7 +689,6 @@ export const getuserorders = async (req, res) => {
       });
     }
 
-
     // Get Customer DB name (tenant)
     const tenantQuery = `
       SELECT db_name 
@@ -694,10 +705,13 @@ export const getuserorders = async (req, res) => {
     const tenantDB = getTenantPool(result.rows[0].db_name);
 
     // Call model function
-    const userorderres = await productmodel.getuserorders(tenantDB,register_id ,userid);
+    const userorderres = await productmodel.getuserorders(
+      tenantDB,
+      register_id,
+      userid
+    );
 
     return res.status(200).json(userorderres);
-
   } catch (err) {
     console.error("user order data get Error:", err);
     return res.status(500).json({
@@ -708,13 +722,14 @@ export const getuserorders = async (req, res) => {
   }
 };
 export const singleorddetail = async (req, res) => {
-// {
-//   "register_id": 1,
-//   "orderid": 3
-// }
+  // {
+  //   "register_id": 1,
+  //   "orderid": 3
+  // }
   try {
-    const {orderid} = req.body;
-   const register_id=req.user.register_id
+    const { orderid } = req.body;
+    
+    const register_id = req.user.register_id;
     if (!register_id) {
       return res.status(400).json({
         status: 0,
@@ -728,7 +743,6 @@ export const singleorddetail = async (req, res) => {
       });
     }
 
-
     // Get Customer DB name (tenant)
     const tenantQuery = `
       SELECT db_name 
@@ -745,10 +759,13 @@ export const singleorddetail = async (req, res) => {
     const tenantDB = getTenantPool(result.rows[0].db_name);
 
     // Call model function
-    const userorderres = await productmodel.singleorddetail(tenantDB,register_id ,orderid);
+    const userorderres = await productmodel.singleorddetail(
+      tenantDB,
+      register_id,
+      orderid
+    );
 
     return res.status(200).json(userorderres);
-
   } catch (err) {
     console.error("order data get Error:", err);
     return res.status(500).json({
@@ -758,6 +775,7 @@ export const singleorddetail = async (req, res) => {
     });
   }
 };
+<<<<<<< HEAD
 export const getsuperdeals = async (req, res) => {
 
 // {
@@ -1065,6 +1083,21 @@ export const cancelPurchaseItem = async (req, res) => {
       });
     }
 
+=======
+export const markOutForDelivery = async (req, res) => {
+  try {
+    const { order_id } = req.body;
+    const register_id = req.user.register_id;
+
+    if (!order_id) {
+      return res.status(400).json({
+        status: 0,
+        message: "Order ID required",
+      });
+    }
+
+    // 🔹 GET TENANT DB
+>>>>>>> c82edc34afc245f3a1c7b11f3ea1a93b21158f1a
     const tenantQuery = `
       SELECT db_name 
       FROM tbl_tenant_databases 
@@ -1075,6 +1108,7 @@ export const cancelPurchaseItem = async (req, res) => {
     if (result.rows.length === 0) {
       return res.status(400).json({
         status: 0,
+<<<<<<< HEAD
         message: "Store not found"
       });
     }
@@ -1184,10 +1218,13 @@ export const purchaselist = async (req, res) => {
     if (tenantRes.rows.length === 0) {
       return res.status(400).json({
         status: 0,
+=======
+>>>>>>> c82edc34afc245f3a1c7b11f3ea1a93b21158f1a
         message: "Store not found",
       });
     }
 
+<<<<<<< HEAD
     const tenantDB = getTenantPool(tenantRes.rows[0].db_name);
 
     const response = await productmodel.getPurchaseList(
@@ -1206,11 +1243,25 @@ export const purchaselist = async (req, res) => {
     return res.status(500).json({
       status: 0,
       message: "Server Error",
+=======
+    const tenantDB = getTenantPool(result.rows[0].db_name);
+
+    // 🔹 CALL MODEL
+    const response = await productmodel.markOutForDelivery(tenantDB, order_id);
+
+    return res.status(200).json(response);
+  } catch (err) {
+    console.error("markOutForDelivery error:", err);
+    return res.status(500).json({
+      status: 0,
+      message: "Server error",
+>>>>>>> c82edc34afc245f3a1c7b11f3ea1a93b21158f1a
       error: err.message,
     });
   }
 };
 
+<<<<<<< HEAD
 export const getPurchaseEditData = async (req, res) => {
   try {
     const { purchase_id } = req.body;
@@ -1224,17 +1275,123 @@ export const getPurchaseEditData = async (req, res) => {
     }
 
     /* ---- GET TENANT DB ---- */
+=======
+export const verifyDeliveryOTP = async (req, res) => {
+  try {
+    const { order_id, otp } = req.body;
+    const register_id = req.user.register_id;
+
+    if (!order_id || !otp) {
+      return res.status(400).json({
+        status: 0,
+        message: "Order ID and OTP required",
+      });
+    }
+
+    // 🔹 GET TENANT DB
+    const tenantQuery = `
+      SELECT db_name 
+      FROM tbl_tenant_databases 
+      WHERE register_id = $1
+    `;
+    const result = await pool.query(tenantQuery, [register_id]);
+
+    if (result.rows.length === 0) {
+      return res.status(400).json({
+        status: 0,
+        message: "Store not found",
+      });
+    }
+
+    const tenantDB = getTenantPool(result.rows[0].db_name);
+
+    // 🔹 CALL MODEL
+    const response = await productmodel.verifyDeliveryOTP(
+      tenantDB,
+      order_id,
+      otp
+    );
+
+    return res.status(200).json(response);
+  } catch (err) {
+    console.error("verifyDeliveryOTP error:", err);
+    return res.status(500).json({
+      status: 0,
+      message: "Server error",
+      error: err.message,
+    });
+  }
+};
+
+export const trackOrder = async (req, res) => {
+  try {
+    const { order_id } = req.body;
+    const register_id = req.user.register_id;
+
+    if (!order_id) {
+      return res.status(400).json({
+        status: 0,
+        message: "Order ID required",
+      });
+    }
+
+    // 🔹 GET TENANT DB
+    const tenantQuery = `
+      SELECT db_name 
+      FROM tbl_tenant_databases 
+      WHERE register_id = $1
+    `;
+    const result = await pool.query(tenantQuery, [register_id]);
+
+    if (result.rows.length === 0) {
+      return res.status(400).json({
+        status: 0,
+        message: "Store not found",
+      });
+    }
+
+    const tenantDB = getTenantPool(result.rows[0].db_name);
+
+    // 🔹 CALL MODEL
+    const response = await productmodel.trackOrder(tenantDB, order_id);
+
+    return res.status(200).json(response);
+  } catch (err) {
+    console.error("trackOrder error:", err);
+    return res.status(500).json({
+      status: 0,
+      message: "Server error",
+      error: err.message,
+    });
+  }
+};
+export const getDeliveryOrderDetails = async (req, res) => {
+  try {
+    const { orderId } = req.params;
+    const register_id = req.user.register_id;
+
+    if (!orderId) {
+      return res.status(400).json({ status: 0, message: "Order ID required" });
+    }
+
+>>>>>>> c82edc34afc245f3a1c7b11f3ea1a93b21158f1a
     const tenantRes = await pool.query(
       `SELECT db_name FROM tbl_tenant_databases WHERE register_id = $1`,
       [register_id]
     );
 
+<<<<<<< HEAD
     if (tenantRes.rows.length === 0) {
       return res.json({ status: 0, message: "Tenant not found" });
+=======
+    if (!tenantRes.rowCount) {
+      return res.status(404).json({ status: 0, message: "Store not found" });
+>>>>>>> c82edc34afc245f3a1c7b11f3ea1a93b21158f1a
     }
 
     const tenantDB = getTenantPool(tenantRes.rows[0].db_name);
 
+<<<<<<< HEAD
     /* ---- FETCH DATA ---- */
     const purchaseData = await productmodel.getPurchaseById(tenantDB, purchase_id);
 
@@ -1350,3 +1507,29 @@ export const getChartdetails = async (req, res) => {
 
 
 
+=======
+    const query = `
+      SELECT 
+        o.order_id,
+        a.name,
+        a.phone,
+        a.full_address
+      FROM tbl_master_orders o
+      JOIN tbl_address a ON a.user_id = o.user_id
+      WHERE o.user_id = $1
+    `;
+
+    const result = await tenantDB.query(query, [orderId]);
+
+    if (!result.rowCount) {
+      return res.status(404).json({ status: 0, message: "Order not found" });
+    }
+
+    return res.json({ status: 1, data: result.rows[0] });
+
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ status: 0, message: "Server error" });
+  }
+};
+>>>>>>> c82edc34afc245f3a1c7b11f3ea1a93b21158f1a

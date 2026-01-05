@@ -12,7 +12,7 @@ export const getProfile = async (req, res) => {
     const result = await tenantPool.query(
       `SELECT address_id, name, phone 
        FROM tbl_address
-       WHERE user_id=$1 AND is_default=true
+       WHERE user_id=$1
        LIMIT 1`,
       [user_id]
     );

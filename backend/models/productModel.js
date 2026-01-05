@@ -2,7 +2,6 @@
 
 const neweditcat = async (tenantDB, category_name, sts, mode, catid) => {
   try {
-
     if (mode === 0) {
       // CHECK IF CATEGORY EXISTS
       const checkExt = await tenantDB.query(
@@ -27,7 +26,6 @@ const neweditcat = async (tenantDB, category_name, sts, mode, catid) => {
         message: "Category added successfully",
         category_id: insert.rows[0].categories_id,
       };
-
     } else if (mode === 1) {
       // CHECK IF CATEGORY EXISTS (EXCEPT CURRENT ONE)
       const checkExt = await tenantDB.query(
@@ -54,7 +52,6 @@ const neweditcat = async (tenantDB, category_name, sts, mode, catid) => {
         category_id: catid,
       };
     }
-
   } catch (error) {
     console.error("Error in product model:", error);
     return { status: 0, message: "Database error", error };
@@ -113,7 +110,6 @@ const bulkuploaditm = async (tenantDB, fullqry) => {
     await tenantDB.query(productsql);
 
     return { status: 1, message: "Items uploaded successfully" };
-
   } catch (error) {
     console.error("Bulk upload error:", error);
     return { status: 0, message: "Upload failed", error };
@@ -130,103 +126,294 @@ const orderdataget = async (tenantDB, store_id, limit, offset, searchtxt) => {
   // } api request
 
   try {
-    const productsql = `
-      SELECT 
-        r.order_no,
-        r.total_amount,
-        COALESCE('tesat','') AS client,
-        r.payment_status,
-        r.order_status,
-        d.delivery_mode,
-        TO_CHAR(r.created_at, 'DD-MM-YYYY HH12:MI AM') AS created_at
-      FROM tbl_master_orders r
-      INNER JOIN tbl_delivery_modes d ON r.delivery_id = d.delivery_id
-      ORDER BY r.created_at DESC
-      LIMIT $1 OFFSET $2;
+    const dataSql = `
+     SELECT 
+  r.order_id,
+  r.order_no,
+  r.total_amount,
+  r.order_status,
+  r.payment_status,
+  d.delivery_mode,
+  r.delivery_start,
+  r.delivery_end,
+  t.name,
+
+  -- ✅ ITEM COUNT
+ COALESCE(SUM(i.product_qty), 0) AS item_count
+
+  
+
+FROM tbl_master_orders r
+
+INNER JOIN tbl_delivery_modes d 
+  ON r.delivery_id = d.delivery_id
+
+INNER JOIN tbl_address t 
+  ON t.user_id = r.user_id
+
+LEFT JOIN tbl_master_order_items i 
+  ON i.order_id = r.order_id
+
+GROUP BY
+  r.order_id,
+  r.order_no,
+  r.total_amount,
+  r.order_status,
+  r.payment_status,
+  d.delivery_mode,
+  r.delivery_start,
+  r.delivery_end,
+  t.name,
+  r.created_at
+
+ORDER BY r.created_at DESC
+LIMIT $1 OFFSET $2;
+
     `;
 
-    const result = await tenantDB.query(productsql, [limit, offset]);
+    const countSql = `SELECT COUNT(*) FROM tbl_master_orders`;
 
-    return { status: 1, message: "Order fetched", data: result.rows };
+    const [dataRes, countRes] = await Promise.all([
+      tenantDB.query(dataSql, [limit, offset]),
+      tenantDB.query(countSql)
+    ]);
 
+    return {
+      status: 1,
+      data: dataRes.rows,
+      total: Number(countRes.rows[0].count)
+    };
   } catch (error) {
     console.error("Order fetch error:", error);
-    return { status: 0, message: "Fetch failed", error };
+    return { status: 0, message: "Fetch failed" };
   }
 };
 const ordersubmit = async (
-  tenantDB, store_id, user_id, address_delivery, total_amount,
-  order_status, delivery_id, payment_status, items_details
+  tenantDB,
+  user_id,
+  address_delivery,
+  total_amount,
+  handling_fee,
+  delivery_fee,
+  delivery_start,
+  delivery_end,
+  order_status,
+  delivery_id,
+  payment_status,
+  payment_method,          // ✅ ADD
+  razorpay_payment_id,     // ✅ ADD
+  razorpay_order_id,       // ✅ ADD
+  razorpay_signature, 
+  items_details,
+  coupon_code = null,
+  coupon_discount = 0,
+  first_order_discount = 0,
+  coupon_id = null
+
 ) => {
   try {
+    await tenantDB.query("BEGIN");
 
-    // Roll number query
-    const rollnosql = `SELECT * FROM tbl_rollno_master WHERE rollid = 1`;
-    const rollnores = await tenantDB.query(rollnosql);
+    /* --------- ROLL NUMBER --------- */
+    const rollnores = await tenantDB.query(
+      `SELECT * FROM tbl_rollno_master WHERE rollid = 1 FOR UPDATE`
+    );
 
-    const prefix = rollnores.rows[0]?.prefix ?? '';
-    const rollid = rollnores.rows[0]?.lastrollid ?? 0;
-    const nodigit = rollnores.rows[0]?.nodigit ?? 2;
+    const prefix = rollnores.rows[0]?.prefix ?? "ORD";
+    const lastId = rollnores.rows[0]?.lastrollid ?? 0;
+    const nodigit = rollnores.rows[0]?.nodigit ?? 4;
 
-    const suffix = rollid.toString().padStart(nodigit, '0');
-    const rollnum = prefix + suffix;
+    const order_no = `${prefix}${String(lastId + 1).padStart(nodigit, "0")}`;
+    
 
-    // Insert into order master
-    const ordsql = `
-      INSERT INTO tbl_master_orders 
-      (order_no, user_id, address_delivery, total_amount, order_status, delivery_id, payment_status)
-      VALUES ($1, $2, $3, $4, $5, $6, $7)
-      RETURNING order_id
-    `;
+// mark coupon used
 
-    const orderRes = await tenantDB.query(ordsql, [
-      rollnum,
-      user_id,
-      address_delivery,
-      total_amount,
-      order_status,
-      delivery_id,
-      payment_status
-    ]);
+
+
+    /* --------- INSERT ORDER --------- */
+   const orderRes = await tenantDB.query(
+  `
+  INSERT INTO tbl_master_orders
+  (
+    order_no,
+    user_id,
+    address_delivery,
+    total_amount,
+    handling_fee,
+    delivery_fee,
+    delivery_start,
+    delivery_end,
+    order_status,
+    delivery_id,
+    payment_status
+  )
+  VALUES (
+    $1, $2, $3, $4, $5,
+    $6,
+    $7::timestamp,
+    $8::timestamp,
+    $9, $10, $11
+  )
+  RETURNING order_id
+  `,
+  [
+    order_no,          // $1
+    user_id,           // $2
+    address_delivery,  // $3
+    total_amount,      // $4
+    handling_fee,      // $5
+    delivery_fee,      // $6 ✅ number
+    delivery_start,    // $7 ✅ timestamp
+    delivery_end,      // $8 ✅ timestamp
+    order_status,      // $9
+    delivery_id,       // $10
+    payment_status,    // $11
+  ]
+);
 
     const order_id = orderRes.rows[0].order_id;
+    await tenantDB.query(
+  `
+  UPDATE tbl_master_orders
+  SET coupon_code = $1,
+      coupon_discount = $2,
+      first_order_discount = $3
+  WHERE order_id = $4
+  `,
+  [
+    coupon_code,
+    coupon_discount,
+    first_order_discount,
+    order_id
+  ]
+);
 
     await tenantDB.query(`UPDATE tbl_rollno_master SET lastrollid = lastrollid + 1 WHERE rollid = 1`);
     // Insert order items
-    for (const item of items_details) {
-      const itemSql = `
-        INSERT INTO tbl_master_order_items 
-        (order_id, product_id, product_name, product_unit, product_qty, product_rate, product_amount, discount_amt, discount_per)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8 ,$9)
-      `;
+// =====================
+// MARK COUPON USED
+// =====================
+console.log("Coupon Data:", {
+  coupon_id,
+  coupon_code,
+  coupon_discount
+});
 
-      await tenantDB.query(itemSql, [
-        order_id,
-        item.product_id,
-        item.product_name,
-        item.product_unit,
-        item.product_qty,
-        item.product_rate,
-        item.product_amount,
-        item.discount_amt,
-        item.discount_per
-      ]);
+let final_coupon_id = null;
+
+if (coupon_code) {
+  const res = await tenantDB.query(
+    `SELECT coupon_id FROM tbl_coupons WHERE coupon_code = $1`,
+    [coupon_code]
+  );
+
+  if (res.rowCount > 0) {
+    final_coupon_id = res.rows[0].coupon_id;
+  }
+}
+
+if (final_coupon_id) {
+  await tenantDB.query(
+    `INSERT INTO tbl_coupon_usage (coupon_id, user_id, order_id)
+     VALUES ($1, $2, $3)`,
+    [final_coupon_id, user_id, order_id]
+  );
+}
+
+
+    /* --------- UPDATE ROLL --------- */
+    await tenantDB.query(
+      `UPDATE tbl_rollno_master SET lastrollid = lastrollid + 1 WHERE rollid = 1`
+    );
+
+    /* --------- INSERT ITEMS --------- */
+    for (const item of items_details) {
+      await tenantDB.query(
+        `
+        INSERT INTO tbl_master_order_items
+        (
+          order_id,
+          product_id,
+          product_name,
+          product_unit,
+          product_qty,
+          product_rate,
+          product_amount,
+          discount_amt,
+          discount_per
+        )
+        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
+        `,
+        [
+          order_id,
+          item.product_id,
+          item.product_name,
+          item.product_unit,
+          item.product_qty,
+          item.product_rate,
+          item.product_amount,
+          item.discount_amt || 0,
+          item.discount_per || 0,
+        ]
+      );
     }
+   // PAYMENT STATUS FOR DB
+const paymentDbStatus =
+  payment_method === "COD" ? "PENDING" : "SUCCESS";
 
     // Update roll number
 
+// INSERT PAYMENT
+await tenantDB.query(
+  `
+  INSERT INTO tbl_master_payment
+  (
+    order_id,
+    method,
+    status,
+    transaction_id,
+    external_payment_id
+  )
+  VALUES ($1,$2,$3,$4,$5)
+  `,
+  [
+    order_id,
+    payment_method === "COD" ? "COD" : payment_method,
+    paymentDbStatus,
+    razorpay_payment_id || null,     // ✅ transaction_id
+    razorpay_order_id || null        // ✅ external_payment_id
+  ]
+);
 
-    return { status: 1, message: "Order Saved Successfully", order_no: rollnum, order_id };
+    /* --------- ORDER TRACKING --------- */
+    await tenantDB.query(
+      `
+      INSERT INTO tbl_order_tracking (order_id, status, message)
+      VALUES ($1, 'pending', 'Order placed successfully')
+      `,
+      [order_id]
+    );
+
+    await tenantDB.query("COMMIT");
+
+    return {
+      status: 1,
+      message: "Order Saved Successfully",
+      order_no,
+      order_id,
+    };
 
   } catch (error) {
+    await tenantDB.query("ROLLBACK");
     console.error("Order save error:", error);
-    return { status: 0, message: "Order save failed", error };
+    return { status: 0, message: "Order save failed" };
   }
 };
 
+
+
 const allcatedetails = async (tenantDB, store_id, mode_fetchorall, cate_id) => {
   try {
-
     let catetsql = `SELECT * FROM tbl_master_categories`;
     let params = [];
 
@@ -235,12 +422,9 @@ const allcatedetails = async (tenantDB, store_id, mode_fetchorall, cate_id) => {
       params.push(cate_id);
     }
 
-
-
     const result = await tenantDB.query(catetsql, params);
 
     return { status: 1, message: "Category fetched", data: result.rows };
-
   } catch (error) {
     console.error("Category fetch error:", error);
     return { status: 0, message: "Fetch failed", error };
@@ -447,6 +631,11 @@ ORDER BY itm.product_id`;
       data: result.rows
     };
 
+    let cateitmsql = `select * from tbl_master_product as itm where categories_id =${cate_id}`;
+
+    const result = await tenantDB.query(cateitmsql);
+
+    return { status: 1, message: "Items fetched", data: result.rows };
   } catch (error) {
     console.error("Items fetch error:", error);
     return { status: 0, message: "Items Fetch failed", error };
@@ -525,24 +714,33 @@ const Itemslist = async (tenantDB, store_id, page, limit, search) => {
 
 const getuserorders = async (tenantDB, store_id, userid) => {
   try {
-    const userordersql = `SELECT * FROM tbl_master_orders WHERE user_id = ${userid}`;
+    const userordersql = `
+      SELECT 
+        o.*,
+        COALESCE(SUM(i.product_qty), 0) AS item_count
+      FROM tbl_master_orders o
+      LEFT JOIN tbl_master_order_items i
+        ON o.order_id = i.order_id
+      WHERE o.user_id = $1
+      GROUP BY o.order_id
+      ORDER BY o.created_at DESC
+    `;
 
-    const result = await tenantDB.query(userordersql);
+    const result = await tenantDB.query(userordersql, [userid]);
+    console.log(result.rows);
+
     let data = {
       processed: [],
       delivered: [],
-      cancelled: []
+      cancelled: [],
     };
 
-
     for (const item of result.rows) {
-      if (item.order_status === "Process") {
+      if (item.order_status === "Process" || item.order_status === "Pending") { 
         data.processed.push(item);
-      }
-      else if (item.order_status === "Delivered") {
+      } else if (item.order_status === "delivered") { 
         data.delivered.push(item);
-      }
-      else if (item.order_status === "Cancelled") {
+      } else if (item.order_status === "cancelled") {
         data.cancelled.push(item);
       }
     }
@@ -552,12 +750,12 @@ const getuserorders = async (tenantDB, store_id, userid) => {
       message: "User orders fetched successfully",
       data: data
     };
-
   } catch (error) {
     console.error("Items fetch error:", error);
     return { status: 0, message: "Items Fetch failed", error };
   }
 };
+
 const singleorddetail = async (tenantDB, store_id, orderid) => {
   try {
 
@@ -1774,6 +1972,69 @@ const getChartdetails = async (tenantDB, chartmode) => {
 
 
 
+const markOutForDelivery = async (tenantDB, order_id) => {
+  const otp = Math.floor(100000 + Math.random() * 900000).toString();
+
+  await tenantDB.query(
+    `UPDATE tbl_master_orders
+     SET order_status='OutForDelivery', delivery_otp=$1
+     WHERE order_id=$2`,
+    [otp, order_id]
+  );
+
+  await tenantDB.query(
+    `INSERT INTO tbl_order_tracking (order_id, status, message)
+     VALUES ($1, 'out_for_delivery', 'Order out for delivery')`,
+    [order_id]
+  );
+
+  return { status: 1, message: "Order out for delivery", otp };
+};
+const verifyDeliveryOTP = async (tenantDB, order_id, otp) => {
+  const res = await tenantDB.query(
+    `SELECT delivery_otp FROM tbl_master_orders
+     WHERE order_id=$1 AND order_status='OutForDelivery'`,
+    [order_id]
+  );
+
+  if (res.rowCount === 0) {
+    return { status: 0, message: "Invalid order" };
+  }
+
+  if (res.rows[0].delivery_otp !== otp) {
+    return { status: 0, message: "Invalid OTP" };
+  }
+
+  await tenantDB.query(
+    `UPDATE tbl_master_orders
+     SET order_status='Delivered', otp_verified=true
+     WHERE order_id=$1`,
+    [order_id]
+  );
+
+  await tenantDB.query(
+    `INSERT INTO tbl_order_tracking (order_id, status, message)
+     VALUES ($1, 'delivered', 'Order delivered successfully')`,
+    [order_id]
+  );
+
+  return { status: 1, message: "Order delivered successfully" };
+};
+
+
+const trackOrder = async (tenantDB, order_id) => {
+  const res = await tenantDB.query(
+    `SELECT status, message, created_at
+     FROM tbl_order_tracking
+     WHERE order_id=$1
+     ORDER BY created_at`,
+    [order_id]
+  );
+
+  return { status: 1, data: res.rows };
+};
+
+
 // EXPORT DEFAULT
 export default {
   neweditcat,
@@ -1800,6 +2061,7 @@ export default {
   Lowstockdetails,
   getDashboardDatas,
   getChartdetails,
+  
 };
 
 

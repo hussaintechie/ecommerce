@@ -115,45 +115,42 @@ export const getCartBill = async (req, res) => {
         status: 1,
         bill: {
           item_total: 0,
-          handling_fee: 0,
+          handling_fee: 7,
           delivery_fee: 0,
-          minimum_order: 200,
-          remaining_amount: 200,
           to_pay: 0,
         },
       });
     }
 
-    // 2. Calculate totals
-    const item_total = cartItems.reduce((sum, item) => {
-      return sum + item.price * item.quantity;
-    }, 0);
+    // 2. Calculate item total
+    const item_total = cartItems.reduce(
+      (sum, item) => sum + item.price * item.quantity,
+      0
+    );
 
-    const handling_fee = 5; // like zepto
-    const delivery_fee = item_total >= 200 ? 0 : "FREE"; // You can change logic
+    // 🔥 NEW BILLING RULES
+    const HANDLING_FEE = 7;
+    const FREE_DELIVERY_LIMIT = 150;
 
-    const MIN_ORDER = 200;
+    const delivery_fee = item_total < FREE_DELIVERY_LIMIT ? 20 : 0;
 
-    const remaining_amount =
-      item_total >= MIN_ORDER ? 0 : MIN_ORDER - item_total;
-
-    const to_pay = item_total + handling_fee + (delivery_fee === 0 ? 0 : 0);
+    const to_pay = item_total + HANDLING_FEE + delivery_fee;
 
     return res.json({
       status: 1,
       bill: {
         item_total,
-        handling_fee,
+        handling_fee: HANDLING_FEE,
         delivery_fee,
-        minimum_order: MIN_ORDER,
-        remaining_amount,
         to_pay,
       },
     });
   } catch (error) {
+    
     res.status(500).json({ message: error.message });
   }
 };
+
 export const getDeliverySlots = async (req, res) => {
   try {
     const now = new Date();
@@ -166,27 +163,40 @@ export const getDeliverySlots = async (req, res) => {
         minute: "2-digit",
       });
 
-    // -------------------------
-    // 1️⃣ Generate TODAY slots
-    // -------------------------
-    let hour = now.getHours() + 1; // next available hour
 
-    for (let i = 0; i < 6; i++) {
-      let start = new Date();
-      start.setHours(hour + i, 30, 0);
 
-      let end = new Date();
-      end.setHours(hour + i + 1, 30, 0);
+const nowHour = now.getHours();
+const nowMin = now.getMinutes();
 
-      // end after 10:30 PM max
-      if (start.getHours() >= 22) break;
+// Start time = next available 30-min block
+let start = new Date();
+if (nowMin <= 30) {
+  start.setHours(nowHour, 30, 0);
+} else {
+  start.setHours(nowHour + 1, 0, 0);
+}
 
-      todaySlots.push({
-        label: `Today, ${formatTime(start)} - ${formatTime(end)}`,
-        start,
-        end,
-      });
-    }
+// Last allowed end time = 8:30 PM
+const lastSlotEnd = new Date();
+lastSlotEnd.setHours(20, 30, 0);
+
+// Loop until end time exceeds 8:30 PM
+while (start < lastSlotEnd) {
+  const end = new Date(start);
+  end.setHours(start.getHours() + 1);
+
+  // stop if end time goes beyond 8:30 PM
+  if (end > lastSlotEnd) break;
+
+  todaySlots.push({
+    label: `Today, ${formatTime(start)} - ${formatTime(end)}`,
+    start,
+    end,
+  });
+
+  // move to next 1-hour slot
+  start = new Date(end);
+}
 
     // -------------------------
     // 2️⃣ Generate TOMORROW slots (fixed pattern)
@@ -196,10 +206,11 @@ export const getDeliverySlots = async (req, res) => {
 
     for (let i = 10; i <= 19; i++) {
       let start = new Date(base);
-      start.setHours(i, 30, 0);
+      
+      start.setHours(i, 0, 0);
 
       let end = new Date(base);
-      end.setHours(i + 1, 30, 0);
+      end.setHours(i + 1, 0, 0);
 
       tomorrowSlots.push({
         label: `Tomorrow, ${formatTime(start)} - ${formatTime(end)}`,
