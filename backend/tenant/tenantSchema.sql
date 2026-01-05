@@ -38,6 +38,10 @@ CREATE TABLE IF NOT EXISTS tbl_master_product (
     discount_per NUMERIC(5,2) DEFAULT 0,
     discount_sts SMALLINT DEFAULT 0,
     itm_spctyp VARCHAR(255) DEFAULT NUll,
+    lowstqty INTEGER DEFAULT 0,
+    itmsts INTEGER DEFAULT 1,
+    openbalqty INTEGER DEFAULT 0,
+    openbaldate DATE,
     created_at TIMESTAMP DEFAULT NOW()
 );
 CREATE TABLE IF NOT EXISTS unitofmeasure_master (
@@ -62,24 +66,7 @@ CREATE TABLE IF NOT EXISTS tmp_tbl_master_product (
     quantity INT,
     unit VARCHAR(50)
 );
-<<<<<<< HEAD
--- CREATE TABLE IF NOT EXISTS tbl_master_orders (
---     order_id SERIAL PRIMARY KEY,
---     order_no VARCHAR(20) DEFAULT '',
---     product_id INT NOT NULL,
---     product_qty INT NOT NULL,
---     product_rate NUMERIC(10,2) NOT NULL,
---     user_id INT NOT NULL,
---     address_delivery TEXT,
---     total_amount NUMERIC(10,2) NOT NULL,
---     order_status VARCHAR(20) DEFAULT 'new',
---     delivery_id INT,
---     payment_status VARCHAR(10) DEFAULT 'pending',
---     delivery_chg NUMERIC(10,2) NOT NULL,
---     discount_amt NUMERIC(10,2) NOT NULL,
---     discount_per NUMERIC(10,2) NOT NULL,
---     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
--- );
+
 
 
 
@@ -145,8 +132,6 @@ CREATE TABLE IF NOT EXISTS tbl_product_images (
     image_url TEXT NOT NULL,
     created_at TIMESTAMP DEFAULT NOW()
 );
-
-<<<<<<< HEAD
 CREATE TABLE IF NOT EXISTS tbl_rollno_master (
     rollid SERIAL PRIMARY KEY,
     prefix VARCHAR(50) NOT NULL,

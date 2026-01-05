@@ -246,6 +246,179 @@ const allcatedetails = async (tenantDB, store_id, mode_fetchorall, cate_id) => {
     return { status: 0, message: "Fetch failed", error };
   }
 };
+const unitlist = async (tenantDB, store_id,) => {
+  try {
+
+    let unitsql = `select unitid,unitname,unitshortcode from unitofmeasure_master `;
+
+    const result = await tenantDB.query(unitsql);
+
+    return { status: 1, message: "Unit fetched", data: result.rows };
+
+  } catch (error) {
+    console.error("Unit fetch error:", error);
+    return { status: 0, message: "Fetch failed", error };
+  }
+};
+const Optionitems = async (tenantDB, store_id,) => {
+  try {
+
+    let itmsql = `  SELECT DISTINCT ON (itm.product_id)
+        itm.product_id AS item_id,
+        itm.title AS item_name,
+		 um.unitid as unit_id,
+		 um.unitname as unit_name,
+        itm.price as rate
+      FROM tbl_master_product itm
+      inner join unitofmeasure_master as um on itm.unit = um.unitid	`;
+
+    const result = await tenantDB.query(itmsql);
+
+    return { status: 1, message: "Item fetched", data: result.rows };
+
+  } catch (error) {
+    console.error("Item fetch error:", error);
+    return { status: 0, message: "Fetch failed", error };
+  }
+};
+const Lowstockdetails = async (
+  tenantDB,
+  store_id,
+  page = 1,
+  limit = 10,
+  search = "",
+  filtertyp = "low" // all | low | out
+) => {
+  try {
+    const offset = (page - 1) * limit;
+    const hasSearch = search && search.trim() !== "";
+
+    const whereSearchData = hasSearch
+      ? `AND LOWER(p.title) LIKE LOWER($3)`
+      : "";
+
+    const whereSearchCount = hasSearch
+      ? `AND LOWER(p.title) LIKE LOWER($1)`
+      : "";
+
+    let whereStockFilter = "";
+
+    if (filtertyp === "low") {
+
+      whereStockFilter = `
+        AND (
+          COALESCE(p.openbalqty + COALESCE(st.current_stock,0), p.openbalqty) > 0
+          AND
+          COALESCE(p.openbalqty + COALESCE(st.current_stock,0), p.openbalqty)
+              <= COALESCE(p.lowstqty,0)
+        )
+      `;
+    }
+    else if (filtertyp === "out") {
+
+      whereStockFilter = `
+        AND (
+          COALESCE(p.openbalqty + COALESCE(st.current_stock,0), p.openbalqty) <= 0
+        )
+      `;
+    }
+
+    const dataSql = `
+      SELECT
+        p.product_id AS id,
+        p.title AS name,
+        p.lowstqty,
+        p.itmsts,
+        COALESCE(
+          p.openbalqty + COALESCE(st.current_stock, 0),
+          p.openbalqty
+        ) AS stock,
+        COALESCE(img.image_url, '') AS image
+      FROM tbl_master_product p
+      LEFT JOIN (
+        SELECT
+          itmid,
+          SUM(
+            CASE
+              WHEN instoreid > 0 THEN stockqty
+              WHEN outstoreid > 0 THEN -stockqty
+              ELSE 0
+            END
+          ) AS current_stock
+        FROM stock_transaction
+        WHERE COALESCE(itmcandel, 0) = 0
+          AND COALESCE(canordersts, 0) = 0
+        GROUP BY itmid
+      ) st ON st.itmid = p.product_id
+      LEFT JOIN (
+        SELECT DISTINCT ON (product_id)
+          product_id,
+          image_url
+        FROM tbl_product_images
+        ORDER BY product_id, image_url
+      ) img ON img.product_id = p.product_id
+      WHERE p.itmsts = 1
+        ${whereSearchData}
+        ${whereStockFilter}
+      ORDER BY p.product_id DESC
+      LIMIT $1 OFFSET $2
+    `;
+
+    const countSql = `
+      SELECT COUNT(*)::int AS count
+      FROM tbl_master_product p
+      LEFT JOIN (
+        SELECT
+          itmid,
+          SUM(
+            CASE
+              WHEN instoreid > 0 THEN stockqty
+              WHEN outstoreid > 0 THEN -stockqty
+              ELSE 0
+            END
+          ) AS current_stock
+        FROM stock_transaction
+        WHERE COALESCE(itmcandel, 0) = 0
+          AND COALESCE(canordersts, 0) = 0
+        GROUP BY itmid
+      ) st ON st.itmid = p.product_id
+      WHERE p.itmsts = 1
+        ${whereSearchCount}
+        ${whereStockFilter}
+    `;
+
+    /* ---------- VALUES ---------- */
+    const dataValues = hasSearch
+      ? [limit, offset, `%${search}%`]
+      : [limit, offset];
+
+    const countValues = hasSearch
+      ? [`%${search}%`]
+      : [];
+
+    const dataRes = await tenantDB.query(dataSql, dataValues);
+    const countRes = await tenantDB.query(countSql, countValues);
+
+    return {
+      status: 1,
+      message: "Stock items fetched successfully",
+      data: dataRes.rows,
+      total: countRes.rows[0]?.count || 0,
+      sql:dataSql,
+    };
+
+  } catch (error) {
+    console.error("Low stock fetch error:", error);
+    return {
+      status: 0,
+      message: "Fetch failed",
+      error: error.message
+    };
+  }
+};
+
+
+
 const catitems = async (tenantDB, store_id, cate_id) => {
 
   //   insert into tbl_product_images (product_id ,image_url)values(2,'C:\Users\Dell\Downloads\product_img\onion2.'),
@@ -297,7 +470,17 @@ const Itemslist = async (tenantDB, store_id, page, limit, search) => {
         itm.price,
         itm.mrp,
         itm.description,
-        'Active' as status,
+        itm.itmsts,
+        itm.unit,
+        CASE
+          WHEN itm.itmsts = 1 THEN 'Active'
+          ELSE 'In-Active'
+        END AS status,
+        itm.lowstqty,
+        itm.openbalqty,
+        itm.openbaldate,
+        itm.discount_per,
+        itm.discount_sts,
         prdimg.image_url AS image
       FROM tbl_master_product itm
       LEFT JOIN tbl_product_images prdimg 
@@ -308,7 +491,7 @@ const Itemslist = async (tenantDB, store_id, page, limit, search) => {
       LIMIT $${search ? 2 : 1} OFFSET $${search ? 3 : 2}
     `;
 
-    //console.log(dataSql ,'dataSql');
+    console.log(dataSql, 'dataSql');
 
     const countSql = `
       SELECT COUNT(*) 
@@ -714,7 +897,7 @@ const submitpurchase = async (
         item.rate,
         item.value,
         item.quantity,
-        item.can_order_status
+        0
       ]);
     }
 
@@ -790,7 +973,7 @@ const updatepurchase = async (
     const itemSql = `
       INSERT INTO stock_transaction
       (purchase_id, purchase_date, instoreid, outstoreid,
-       itmid, itmname, unitid, stockqty, rate, value, canordersts)
+       itmid, itmname, unitid, stockqty, rate, value)
       VALUES
       ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
     `;
@@ -807,7 +990,6 @@ const updatepurchase = async (
         item.quantity,
         item.rate,
         item.value,
-        item.can_order_status
       ]);
     }
 
@@ -1102,6 +1284,496 @@ export const getPurchaseById = async (tenantDB, purchaseId) => {
   };
 };
 
+
+const saveItem = async (tenantDB, storeid, product) => {
+  let inTx = false;
+
+  try {
+    /* ---------- VALIDATION ---------- */
+    if (!product?.name?.trim()) {
+      return { status: 0, message: "Item name is required" };
+    }
+
+    if (!product.category && !product.categories_id) {
+      return { status: 0, message: "Category is required" };
+    }
+
+    if (!product.unit) {
+      return { status: 0, message: "Unit is required" };
+    }
+
+    const categoryId = product.category ?? 0;
+    const price = Number(product.basePrice ?? 0);
+    const mrp = Number(product.mrp ?? 0);
+    const lowStockQty = Number(product.lowstqty ?? 0);
+    const openBalQty = Number(product.openbalqty ?? 0);
+    const openBalDate = product.openbaldate || null;
+    const itemStatus = product.itmsts ?? 1;
+    const dissts = product.discount_sts ?? 0;
+    const disper = Number(product.discount_per ?? 0);
+
+    /* ---------- BEGIN TRANSACTION ---------- */
+    await tenantDB.query("BEGIN");
+    inTx = true;
+
+    /* ================= INSERT ================= */
+    if (!product.id || Number(product.id) === 0) {
+
+      /* ---- DUPLICATE CHECK ---- */
+      const dupRes = await tenantDB.query(
+        `SELECT 1 FROM tbl_master_product WHERE LOWER(title) = LOWER($1) LIMIT 1`,
+        [product.name.trim()]
+      );
+
+      if (dupRes.rows.length > 0) {
+        await tenantDB.query("ROLLBACK");
+        return { status: 0, message: "Item name already exists" };
+      }
+
+      const insertSql = `
+        INSERT INTO tbl_master_product (
+          categories_id,
+          title,
+          description,
+          price,
+          mrp,
+          quantity,
+          unit,
+          lowstqty,
+          itmsts,
+          openbalqty,
+          openbaldate,
+          discount_sts,
+          discount_per,
+          created_at
+        ) VALUES (
+          $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,now()
+        )
+        RETURNING product_id
+      `;
+
+      const insertValues = [
+        categoryId,
+        product.name.trim(),
+        product.description || "",
+        price,
+        mrp,
+        0,
+        product.unit,
+        lowStockQty,
+        itemStatus,
+        openBalQty,
+        openBalDate,
+        dissts,
+        disper
+      ];
+
+      const result = await tenantDB.query(insertSql, insertValues);
+      const productId = result.rows[0].product_id;
+
+      if (product.image) {
+        await tenantDB.query(
+          `INSERT INTO tbl_product_images (product_id, image_url)
+           VALUES ($1, $2)`,
+          [productId, product.image]
+        );
+      }
+
+      await tenantDB.query("COMMIT");
+
+      return {
+        status: 1,
+        message: "Item inserted successfully",
+        product_id: productId
+      };
+    }
+
+    /* ================= UPDATE ================= */
+    const updateSql = `
+      UPDATE tbl_master_product
+      SET
+        categories_id = $1,
+        title = $2,
+        description = $3,
+        price = $4,
+        mrp = $5,
+        unit = $6,
+        lowstqty = $7,
+        itmsts = $8,
+        openbalqty = $9,
+        openbaldate = $10,
+        discount_sts = $11,
+        discount_per = $12
+      WHERE product_id = $13
+    `;
+
+    const updateValues = [
+      categoryId,
+      product.name.trim(),
+      product.description || "",
+      price,
+      mrp,
+      product.unit,
+      lowStockQty,
+      itemStatus,
+      openBalQty,
+      openBalDate,
+      dissts,
+      disper,
+      product.id
+    ];
+
+    const updateRes = await tenantDB.query(updateSql, updateValues);
+
+    if (updateRes.rowCount === 0) {
+      throw new Error("Product not found");
+    }
+
+    if (product.image) {
+      await tenantDB.query(
+        `DELETE FROM tbl_product_images WHERE product_id = $1`,
+        [product.id]
+      );
+
+      await tenantDB.query(
+        `INSERT INTO tbl_product_images (product_id, image_url)
+         VALUES ($1, $2)`,
+        [product.id, product.image]
+      );
+    }
+
+    await tenantDB.query("COMMIT");
+
+    return {
+      status: 1,
+      message: "Item updated successfully"
+    };
+
+  } catch (error) {
+    if (inTx) await tenantDB.query("ROLLBACK");
+
+    console.error("Item save error:", error);
+
+    return {
+      status: 0,
+      message: error.message || "Item save failed"
+    };
+  }
+};
+const getDashboardDatas = async (tenantDB, chartmode, date) => {
+  let chartsql = "";
+
+  try {
+    /* ---------------- CHART QUERY (RAW) ---------------- */
+
+    if (chartmode === "Week") {
+      chartsql = `
+        SELECT
+          TO_CHAR(created_at::date, 'Dy') AS name,
+          SUM(total_amount)::numeric(10,2) AS sales
+        FROM tbl_master_orders
+        WHERE created_at >= CURRENT_DATE - INTERVAL '6 days'
+          AND created_at < CURRENT_DATE + INTERVAL '1 day'
+          AND payment_status = 'complete'
+          AND order_status != 'cancelled'
+        GROUP BY created_at::date
+        ORDER BY created_at::date;
+      `;
+
+    }
+
+    else if (chartmode === "Month") {
+      chartsql = `
+        SELECT
+          'Week ' || (
+            FLOOR((EXTRACT(DAY FROM created_at) - 1) / 7) + 1
+          ) AS name,
+          SUM(total_amount)::numeric(10,2) AS sales
+        FROM tbl_master_orders
+        WHERE created_at >= DATE_TRUNC('month', CURRENT_DATE)
+          AND created_at < DATE_TRUNC('month', CURRENT_DATE) + INTERVAL '1 month'
+          AND payment_status = 'complete'
+          AND order_status != 'cancelled'
+        GROUP BY name
+        ORDER BY name;
+      `;
+    }
+
+    else if (chartmode === "Year") {
+      chartsql = `
+        SELECT
+          TO_CHAR(created_at, 'Mon') AS name,
+          SUM(total_amount)::numeric(10,2) AS sales
+        FROM tbl_master_orders
+        WHERE created_at >= DATE_TRUNC('year', CURRENT_DATE)
+          AND created_at < DATE_TRUNC('year', CURRENT_DATE) + INTERVAL '1 year'
+          AND payment_status = 'complete'
+          AND order_status != 'cancelled'
+        GROUP BY DATE_TRUNC('month', created_at), TO_CHAR(created_at, 'Mon')
+        ORDER BY DATE_TRUNC('month', created_at);
+      `;
+    }
+
+    /* ---------------- SUMMARY (TODAY vs YESTERDAY) ---------------- */
+
+    const summarysql = `
+      SELECT
+        /* TODAY */
+        COUNT(*) FILTER (
+          WHERE created_at >= '${date}'::date
+            AND created_at <  '${date}'::date + INTERVAL '1 day'
+            AND order_status != 'cancelled'
+        ) AS today_orders,
+
+        SUM(total_amount) FILTER (
+          WHERE created_at >= '${date}'::date
+            AND created_at <  '${date}'::date + INTERVAL '1 day'
+            AND payment_status = 'complete'
+            AND order_status != 'cancelled'
+        ) AS today_revenue,
+
+        COUNT(*) FILTER (
+          WHERE created_at >= '${date}'::date
+            AND created_at <  '${date}'::date + INTERVAL '1 day'
+            AND order_status = 'Pending'
+        ) AS today_pending,
+
+        /* YESTERDAY */
+        COUNT(*) FILTER (
+          WHERE created_at >= '${date}'::date - INTERVAL '1 day'
+            AND created_at <  '${date}'::date
+            AND order_status != 'cancelled'
+        ) AS yesterday_orders,
+
+        SUM(total_amount) FILTER (
+          WHERE created_at >= '${date}'::date - INTERVAL '1 day'
+            AND created_at <  '${date}'::date
+            AND payment_status = 'complete'
+            AND order_status != 'cancelled'
+        ) AS yesterday_revenue,
+
+        COUNT(*) FILTER (
+          WHERE created_at >= '${date}'::date - INTERVAL '1 day'
+            AND created_at <  '${date}'::date
+            AND order_status = 'Pending'
+        ) AS yesterday_pending
+      FROM tbl_master_orders;
+    `;
+
+    /* ---------------- LOW STOCK ---------------- */
+
+    const lowstocksql = `
+       SELECT
+        p.product_id AS id,
+        p.title AS name,
+        p.lowstqty,
+        p.itmsts,
+        COALESCE(
+          p.openbalqty + COALESCE(st.current_stock, 0),
+          p.openbalqty
+        ) AS stock,
+        COALESCE(img.image_url, '') AS image
+      FROM tbl_master_product p
+      LEFT JOIN (
+        SELECT
+          itmid,
+          SUM(
+            CASE
+              WHEN instoreid > 0 THEN stockqty
+              WHEN outstoreid > 0 THEN -stockqty
+              ELSE 0
+            END
+          ) AS current_stock
+        FROM stock_transaction
+        WHERE COALESCE(itmcandel, 0) = 0
+          AND COALESCE(canordersts, 0) = 0
+        GROUP BY itmid
+      ) st ON st.itmid = p.product_id
+      LEFT JOIN (
+        SELECT DISTINCT ON (product_id)
+          product_id,
+          image_url
+        FROM tbl_product_images
+        ORDER BY product_id, image_url
+      ) img ON img.product_id = p.product_id
+      WHERE p.itmsts = 1
+        AND (
+          COALESCE(p.openbalqty + COALESCE(st.current_stock,0), p.openbalqty) > 0
+          AND
+          COALESCE(p.openbalqty + COALESCE(st.current_stock,0), p.openbalqty)
+              <= COALESCE(p.lowstqty,0)
+        )
+      ORDER BY COALESCE(st.current_stock,0) DESC limit 5
+    `;
+
+    /* ---------------- EXECUTION ---------------- */
+
+    const chartres = chartsql ? await tenantDB.query(chartsql) : { rows: [] };
+    const summaryres = await tenantDB.query(summarysql);
+    const lowstockres = await tenantDB.query(lowstocksql);
+
+    return {
+      status: 1,
+      message: "DashboardDatas fetched",
+      data: {
+        chartres: chartres.rows,
+        summary: summaryres.rows[0],
+        lowstockdetailsres: lowstockres.rows,
+
+        // 👇 RAW SQL FOR DEBUGGING
+        // debug_sql: {
+        //   chartsql,
+        //   summarysql,
+        //   lowstocksql
+        // }
+      }
+    };
+
+  } catch (error) {
+    console.error("DashboardDatas fetch error:", error);
+    return {
+      status: 0,
+      message: "DashboardDatas Fetch failed",
+      error
+    };
+  }
+};
+
+
+const WEEK_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+
+const MONTH_LABELS = [
+  'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+  'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
+];
+
+const MONTH_WEEK_LABELS = [
+  'Week 1', 'Week 2', 'Week 3', 'Week 4', 'Week 5'
+];
+
+
+const toSalesMap = (rows) => {
+  const map = {};
+  rows.forEach(r => {
+    map[r.name] = Number(r.sales || 0);
+  });
+  return map;
+};
+
+
+const buildWeekData = (rows) => {
+  const map = toSalesMap(rows);
+  return WEEK_LABELS.map(day => ({
+    name: day,
+    sales: map[day] || 0
+  }));
+};
+
+const buildMonthData = (rows) => {
+  const map = toSalesMap(rows);
+  return MONTH_WEEK_LABELS.map(week => ({
+    name: week,
+    sales: map[week] || 0
+  }));
+};
+
+const buildYearData = (rows) => {
+  const map = toSalesMap(rows);
+  return MONTH_LABELS.map(month => ({
+    name: month,
+    sales: map[month] || 0
+  }));
+};
+
+const getChartdetails = async (tenantDB, chartmode) => {
+  let chartsql = "";
+
+  try {
+    /* ---------------- WEEK ---------------- */
+    if (chartmode === "Week") {
+      chartsql = `
+        SELECT
+          TO_CHAR(created_at::date, 'Dy') AS name,
+          SUM(total_amount)::numeric(10,2) AS sales
+        FROM tbl_master_orders
+        WHERE created_at >= CURRENT_DATE - INTERVAL '6 days'
+          AND created_at < CURRENT_DATE + INTERVAL '1 day'
+          AND payment_status = 'complete'
+          AND order_status != 'cancelled'
+        GROUP BY created_at::date
+        ORDER BY created_at::date;
+      `;
+    }
+
+    /* ---------------- MONTH ---------------- */
+    else if (chartmode === "Month") {
+      chartsql = `
+        SELECT
+          'Week ' || (FLOOR((EXTRACT(DAY FROM created_at) - 1) / 7) + 1) AS name,
+          SUM(total_amount)::numeric(10,2) AS sales
+        FROM tbl_master_orders
+        WHERE created_at >= DATE_TRUNC('month', CURRENT_DATE)
+          AND created_at < DATE_TRUNC('month', CURRENT_DATE) + INTERVAL '1 month'
+          AND payment_status = 'complete'
+          AND order_status != 'cancelled'
+        GROUP BY name
+        ORDER BY name;
+      `;
+    }
+
+    /* ---------------- YEAR ---------------- */
+    else if (chartmode === "Year") {
+      chartsql = `
+        SELECT
+          TO_CHAR(created_at, 'Mon') AS name,
+          SUM(total_amount)::numeric(10,2) AS sales
+        FROM tbl_master_orders
+        WHERE created_at >= DATE_TRUNC('year', CURRENT_DATE)
+          AND created_at < DATE_TRUNC('year', CURRENT_DATE) + INTERVAL '1 year'
+          AND payment_status = 'complete'
+          AND order_status != 'cancelled'
+        GROUP BY DATE_TRUNC('month', created_at), TO_CHAR(created_at, 'Mon')
+        ORDER BY DATE_TRUNC('month', created_at);
+      `;
+    }
+
+    /* ---------------- EXECUTE QUERY ---------------- */
+    const chartres = chartsql
+      ? await tenantDB.query(chartsql)
+      : { rows: [] };
+
+    /* ---------------- NORMALIZE DATA ---------------- */
+    let finalChartData = [];
+
+    if (chartmode === "Week") {
+      finalChartData = buildWeekData(chartres.rows);
+    }
+    else if (chartmode === "Month") {
+      finalChartData = buildMonthData(chartres.rows);
+    }
+    else if (chartmode === "Year") {
+      finalChartData = buildYearData(chartres.rows);
+    }
+
+    /* ---------------- RESPONSE ---------------- */
+    return {
+      status: 1,
+      message: "Chart data fetched",
+      data: finalChartData
+    };
+
+  } catch (error) {
+    console.error("Chart fetch error:", error);
+    return {
+      status: 0,
+      message: "Chart fetch failed",
+      error
+    };
+  }
+};
+
+
+
 // EXPORT DEFAULT
 export default {
   neweditcat,
@@ -1122,6 +1794,12 @@ export default {
   getPurchaseList,
   getPurchaseById,
   Itemslist,
+  unitlist,
+  saveItem,
+  Optionitems,
+  Lowstockdetails,
+  getDashboardDatas,
+  getChartdetails,
 };
 
 

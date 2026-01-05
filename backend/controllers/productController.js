@@ -507,6 +507,152 @@ export const Itemslist = async (req, res) => {
     return res.status(500).json({ status: 0, message: "Server Error" });
   }
 };
+export const unitlist = async (req, res) => {
+  try {
+    const register_id = req.user.register_id;
+  
+    if (!register_id) {
+      return res.status(400).json({ status: 0, message: "Store ID required" });
+    }
+
+    const tenantQuery = `
+      SELECT db_name 
+      FROM tbl_tenant_databases 
+      WHERE register_id = $1
+    `;
+    const tenantRes = await pool.query(tenantQuery, [register_id]);
+
+    if (!tenantRes.rows.length) {
+      return res.status(400).json({ status: 0, message: "Store not found" });
+    }
+
+    const tenantDB = getTenantPool(tenantRes.rows[0].db_name);
+
+    const result = await productmodel.unitlist(
+      tenantDB,
+      register_id,
+    );
+
+    return res.status(200).json(result);
+
+  } catch (err) {
+    console.error("Items data get Error:", err);
+    return res.status(500).json({ status: 0, message: "Server Error" });
+  }
+};
+export const Optionitems = async (req, res) => {
+  try {
+    const register_id = req.user.register_id;
+  
+    if (!register_id) {
+      return res.status(400).json({ status: 0, message: "Store ID required" });
+    }
+
+    const tenantQuery = `
+      SELECT db_name 
+      FROM tbl_tenant_databases 
+      WHERE register_id = $1
+    `;
+    const tenantRes = await pool.query(tenantQuery, [register_id]);
+
+    if (!tenantRes.rows.length) {
+      return res.status(400).json({ status: 0, message: "Store not found" });
+    }
+
+    const tenantDB = getTenantPool(tenantRes.rows[0].db_name);
+
+    const result = await productmodel.Optionitems(
+      tenantDB,
+      register_id,
+    );
+
+    return res.status(200).json(result);
+
+  } catch (err) {
+    console.error("Items data get Error:", err);
+    return res.status(500).json({ status: 0, message: "Server Error" });
+  }
+};
+export const Lowstockdetails = async (req, res) => {
+  try {
+    const register_id = req.user?.register_id;
+    const { page = 1, limit = 10, search = "" ,filtertyp} = req.body;
+
+    if (!register_id) {
+      return res.status(401).json({
+        status: 0,
+        message: "Unauthorized"
+      });
+    }
+
+    const tenantRes = await pool.query(
+      `SELECT db_name FROM tbl_tenant_databases WHERE register_id = $1`,
+      [register_id]
+    );
+
+    if (!tenantRes.rows.length) {
+      return res.status(404).json({
+        status: 0,
+        message: "Store not found"
+      });
+    }
+
+    const tenantDB = getTenantPool(tenantRes.rows[0].db_name);
+
+    const result = await productmodel.Lowstockdetails(
+      tenantDB,
+      register_id,
+      Number(page),
+      Number(limit),
+      search,
+      filtertyp
+    );
+
+    return res.status(200).json(result);
+  } catch (err) {
+    console.error("Low stock controller error:", err);
+    return res.status(500).json({
+      status: 0,
+      message: "Server Error",
+      error: err.message
+    });
+  }
+};
+
+export const saveItem = async (req, res) => {
+  try {
+    const register_id = req.user.register_id;
+      const { productdata } = req.body;
+    if (!register_id) {
+      return res.status(400).json({ status: 0, message: "Store ID required" });
+    }
+
+    const tenantQuery = `
+      SELECT db_name 
+      FROM tbl_tenant_databases 
+      WHERE register_id = $1
+    `;
+    const tenantRes = await pool.query(tenantQuery, [register_id]);
+
+    if (!tenantRes.rows.length) {
+      return res.status(400).json({ status: 0, message: "Store not found" });
+    }
+
+    const tenantDB = getTenantPool(tenantRes.rows[0].db_name);
+
+    const result = await productmodel.saveItem(
+      tenantDB,
+      register_id,
+      productdata
+    );
+
+    return res.status(200).json(result);
+
+  } catch (err) {
+    console.error("Items data get Error:", err);
+    return res.status(500).json({ status: 0, message: "Server Error" });
+  }
+};
 
 export const getuserorders = async (req, res) => {
 
@@ -1102,6 +1248,95 @@ export const getPurchaseEditData = async (req, res) => {
     return res.json({
       status: 1,
       data: purchaseData,
+    });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({
+      status: 0,
+      message: "Server error",
+    });
+  }
+};
+export const getDashboardDatas = async (req, res) => {
+ 
+//  {
+//     "chartmode":"year"
+// }
+  try {
+    const { chartmode ,date} = req.body;
+    const register_id = req.user.register_id;
+
+    // if (!chartmode) {
+    //   return res.json({
+    //     status: 0,
+    //     message: "chartmode required",
+    //   });
+    // }
+
+    /* ---- GET TENANT DB ---- */
+    const tenantRes = await pool.query(
+      `SELECT db_name FROM tbl_tenant_databases WHERE register_id = $1`,
+      [register_id]
+    );
+
+    if (tenantRes.rows.length === 0) {
+      return res.json({ status: 0, message: "Tenant not found" });
+    }
+
+    const tenantDB = getTenantPool(tenantRes.rows[0].db_name);
+
+    /* ---- FETCH DATA ---- */
+    const DashboardDatas = await productmodel.getDashboardDatas(tenantDB,chartmode ,date);
+
+    if (!DashboardDatas) {
+      return res.json({
+        status: 0,
+        message: "tDashboardDatas not found",
+      });
+    }
+
+    return res.json({
+      status: 1,
+      data: DashboardDatas,
+    });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({
+      status: 0,
+      message: "Server error",
+    });
+  }
+};
+export const getChartdetails = async (req, res) => {
+  try {
+    const { chartmode} = req.body;
+    const register_id = req.user.register_id;
+
+    /* ---- GET TENANT DB ---- */
+    const tenantRes = await pool.query(
+      `SELECT db_name FROM tbl_tenant_databases WHERE register_id = $1`,
+      [register_id]
+    );
+
+    if (tenantRes.rows.length === 0) {
+      return res.json({ status: 0, message: "Tenant not found" });
+    }
+
+    const tenantDB = getTenantPool(tenantRes.rows[0].db_name);
+
+    /* ---- FETCH DATA ---- */
+    const DashboardDatas = await productmodel.getChartdetails(tenantDB,chartmode );
+
+    if (!DashboardDatas) {
+      return res.json({
+        status: 0,
+        message: "Dashboar Datas not found",
+      });
+    }
+
+    return res.json({
+      status: 1,
+      data: DashboardDatas,
     });
   } catch (err) {
     console.error(err);
