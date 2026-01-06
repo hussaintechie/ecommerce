@@ -19,16 +19,31 @@ import http from "http";
 import { Server } from "socket.io";
 import dotenv from "dotenv";
 import deliveryPartnerModel from "./routes/deliveryPartnerRoutes.js";
+import reviewRoutes from "./routes/review.js";
 dotenv.config();
 
 const app = express();
 const server = http.createServer(app);
 app.use(cors({
-  origin: ["http://localhost:5173", "http://localhost:8081"],
+  origin: function (origin, callback) {
+    const allowedOrigins = [
+      "https://user.sribalajistores.com",
+      "https://api.sribalajistores.com",
+      "http://localhost:8081",
+      "https://admin.sribalajistores.com"
+    ];
+
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error("CORS not allowed"));
+    }
+  },
+  credentials: true,
   methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-  allowedHeaders: ["Content-Type", "Authorization"],
-  credentials: true
+  allowedHeaders: ["Content-Type", "Authorization"]
 }));
+
 const io = new Server(server, {
   cors: {
     origin: "*", // dev only
@@ -55,6 +70,7 @@ app.use("/tuser", trackorderRoutes_user);
 app.use("/invoice",invoiceRoutes) 
 app.use("/coupon",couponRoutes)
 app.use("/deliveryPartner", deliveryPartnerModel)
+app.use("/review", reviewRoutes); 
 
 app.use("/auth", authRoutes);
 app.use("/fuser", favoriteRoutes_user);

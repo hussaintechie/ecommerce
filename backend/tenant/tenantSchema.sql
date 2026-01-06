@@ -203,3 +203,12 @@ CREATE TABLE tbl_delivery_partner (
   status SMALLINT DEFAULT 1, -- 1 = active, 0 = inactive
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+CREATE TABLE tbl_customer_review (
+  review_id SERIAL PRIMARY KEY,
+  user_id INT NOT NULL UNIQUE,
+  rating INT CHECK (rating BETWEEN 1 AND 5),
+  tags TEXT[],
+  comment TEXT,
+  is_reviewed BOOLEAN DEFAULT TRUE,
+  created_at TIMESTAMP DEFAULT NOW()
+);

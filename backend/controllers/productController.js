@@ -329,6 +329,12 @@ export const submitorder = async (req, res) => {
     );
 
     tenantDB = getTenantPool(t.rows[0].db_name);
+    if (delivery_start == "Immediate") {
+  return res.status(400).json({
+    status: 0,
+    message: "Delivery end time missing",
+  });
+}
 
     const orderdatares = await productmodel.ordersubmit(
       tenantDB,
@@ -352,12 +358,7 @@ export const submitorder = async (req, res) => {
   req.body.first_order_discount,
   req.body.coupon_id
     );
-if (delivery_start == "Immediate") {
-  return res.status(400).json({
-    status: 0,
-    message: "Delivery end time missing",
-  });
-}
+
 // 🔔 REAL-TIME NOTIFICATION
 
     if (!orderdatares || orderdatares.status !== 1) {
