@@ -13,11 +13,13 @@ CREATE TABLE tbl_address (
 
     pincode         VARCHAR(10),
     address_type    VARCHAR(50),
-
     lat             DECIMAL(10,6),
     lng             DECIMAL(10,6),
     is_default BOOLEAN DEFAULT false,
+<<<<<<< HEAD
+=======
 
+>>>>>>> c82edc34afc245f3a1c7b11f3ea1a93b21158f1a
     created_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 CREATE TABLE IF NOT EXISTS tbl_master_categories (
@@ -38,6 +40,13 @@ CREATE TABLE IF NOT EXISTS tbl_master_product (
     unit INT,
     lowstqty INTEGER DEFAULT 0,
     thumbnail TEXT,
+    discount_per NUMERIC(5,2) DEFAULT 0,
+    discount_sts SMALLINT DEFAULT 0,
+    itm_spctyp VARCHAR(255) DEFAULT NUll,
+    lowstqty INTEGER DEFAULT 0,
+    itmsts INTEGER DEFAULT 1,
+    openbalqty INTEGER DEFAULT 0,
+    openbaldate DATE,
     created_at TIMESTAMP DEFAULT NOW()
 );
 CREATE TABLE IF NOT EXISTS unitofmeasure_master (
@@ -129,6 +138,8 @@ CREATE TABLE IF NOT EXISTS tbl_product_images (
     image_url TEXT NOT NULL,
     created_at TIMESTAMP DEFAULT NOW()
 );
+<<<<<<< HEAD
+=======
 
 create table tbl_favorites (
 fav_id serial primary key,
@@ -138,6 +149,7 @@ created_at timestamp default now(),
 unique(user_id,product_id)
 
 );
+>>>>>>> c82edc34afc245f3a1c7b11f3ea1a93b21158f1a
 CREATE TABLE IF NOT EXISTS tbl_rollno_master (
     rollid SERIAL PRIMARY KEY,
     prefix VARCHAR(50) NOT NULL,
