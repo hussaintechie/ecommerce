@@ -4,6 +4,7 @@ export const auth = (req, res, next) => {
     req.user = {
       register_id: 27,
       user_id: 1,
+
       role: "user",
     };
     return next();
