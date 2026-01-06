@@ -1,15 +1,10 @@
 import express  from "express"
 import multer from "multer"
-<<<<<<< HEAD
 import {addCategoryProduct ,neweditcategory ,createitmfile ,orderdatas ,submitorder ,allcatedetails ,catitems
          ,getuserorders,singleorddetail ,getsuperdeals ,flashsaleprocess,getflashsale,submitpurchase
         ,cancelPurchaseItem,cancelPurchase,purchaselist,getPurchaseEditData,Itemslist ,unitlist,saveItem
         ,Optionitems,Lowstockdetails,getDashboardDatas,getChartdetails,
        }  from "../controllers/productController.js";
-=======
-import {addCategoryProduct ,neweditcategory ,createitmfile ,orderdatas ,submitorder ,allcatedetails ,catitems ,getuserorders,singleorddetail,
-markOutForDelivery,verifyDeliveryOTP,trackOrder } from "../controllers/productController.js";
->>>>>>> c82edc34afc245f3a1c7b11f3ea1a93b21158f1a
 import {auth} from "../middleware/authMiddleware.js"
 
 const router =express.Router()
