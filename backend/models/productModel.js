@@ -129,7 +129,7 @@ const orderdataget = async (tenantDB, store_id, limit, offset, searchtxt) => {
   r.delivery_end,
   t.name,
 
-  -- ✅ ITEM COUNT
+ 
   COUNT(i.ord_trnid) AS item_count,
 
   TO_CHAR(r.created_at, 'YYYY-MM-DD') AS date,
@@ -167,13 +167,13 @@ LIMIT $1 OFFSET $2;
 
     const [dataRes, countRes] = await Promise.all([
       tenantDB.query(dataSql, [limit, offset]),
-      tenantDB.query(countSql)
+      tenantDB.query(countSql),
     ]);
 
     return {
       status: 1,
       data: dataRes.rows,
-      total: Number(countRes.rows[0].count)
+      total: Number(countRes.rows[0].count),
     };
   } catch (error) {
     console.error("Order fetch error:", error);
@@ -192,10 +192,10 @@ const ordersubmit = async (
   order_status,
   delivery_id,
   payment_status,
-  payment_method,          // ✅ ADD
-  razorpay_payment_id,     // ✅ ADD
-  razorpay_order_id,       // ✅ ADD
-  razorpay_signature, 
+  payment_method, // ✅ ADD
+  razorpay_payment_id, // ✅ ADD
+  razorpay_order_id, // ✅ ADD
+  razorpay_signature,
   items_details
 ) => {
   try {
@@ -213,8 +213,8 @@ const ordersubmit = async (
     const order_no = `${prefix}${String(lastId + 1).padStart(nodigit, "0")}`;
 
     /* --------- INSERT ORDER --------- */
-   const orderRes = await tenantDB.query(
-  `
+    const orderRes = await tenantDB.query(
+      `
   INSERT INTO tbl_master_orders
   (
     order_no,
@@ -238,20 +238,20 @@ const ordersubmit = async (
   )
   RETURNING order_id
   `,
-  [
-    order_no,          // $1
-    user_id,           // $2
-    address_delivery,  // $3
-    total_amount,      // $4
-    handling_fee,      // $5
-    delivery_fee,      // $6 ✅ number
-    delivery_start,    // $7 ✅ timestamp
-    delivery_end,      // $8 ✅ timestamp
-    order_status,      // $9
-    delivery_id,       // $10
-    payment_status,    // $11
-  ]
-);
+      [
+        order_no, // $1
+        user_id, // $2
+        address_delivery, // $3
+        total_amount, // $4
+        handling_fee, // $5
+        delivery_fee, // $6 ✅ number
+        delivery_start, // $7 ✅ timestamp
+        delivery_end, // $8 ✅ timestamp
+        order_status, // $9
+        delivery_id, // $10
+        payment_status, // $11
+      ]
+    );
 
     const order_id = orderRes.rows[0].order_id;
 
@@ -291,13 +291,12 @@ const ordersubmit = async (
         ]
       );
     }
-   // PAYMENT STATUS FOR DB
-const paymentDbStatus =
-  payment_method === "COD" ? "PENDING" : "SUCCESS";
+    // PAYMENT STATUS FOR DB
+    const paymentDbStatus = payment_method === "COD" ? "PENDING" : "SUCCESS";
 
-// INSERT PAYMENT
-await tenantDB.query(
-  `
+    // INSERT PAYMENT
+    await tenantDB.query(
+      `
   INSERT INTO tbl_master_payment
   (
     order_id,
@@ -308,14 +307,14 @@ await tenantDB.query(
   )
   VALUES ($1,$2,$3,$4,$5)
   `,
-  [
-    order_id,
-    payment_method === "COD" ? "COD" : payment_method,
-    paymentDbStatus,
-    razorpay_payment_id || null,     // ✅ transaction_id
-    razorpay_order_id || null        // ✅ external_payment_id
-  ]
-);
+      [
+        order_id,
+        payment_method === "COD" ? "COD" : payment_method,
+        paymentDbStatus,
+        razorpay_payment_id || null, // ✅ transaction_id
+        razorpay_order_id || null, // ✅ external_payment_id
+      ]
+    );
 
     /* --------- ORDER TRACKING --------- */
     await tenantDB.query(
@@ -334,15 +333,12 @@ await tenantDB.query(
       order_no,
       order_id,
     };
-
   } catch (error) {
     await tenantDB.query("ROLLBACK");
     console.error("Order save error:", error);
     return { status: 0, message: "Order save failed" };
   }
 };
-
-
 
 const allcatedetails = async (tenantDB, store_id, mode_fetchorall, cate_id) => {
   try {
@@ -398,9 +394,9 @@ const getuserorders = async (tenantDB, store_id, userid) => {
     };
 
     for (const item of result.rows) {
-      if (item.order_status === "Process" || item.order_status === "Pending") { 
+      if (item.order_status === "Process" || item.order_status === "Pending") {
         data.processed.push(item);
-      } else if (item.order_status === "delivered") { 
+      } else if (item.order_status === "delivered") {
         data.delivered.push(item);
       } else if (item.order_status === "cancelled") {
         data.cancelled.push(item);
@@ -492,7 +488,6 @@ const singleorddetail = async (tenantDB, store_id, orderid) => {
     console.error("Order fetch error:", error);
     return { status: 0, message: "Order Fetch failed", error };
   }
-  
 };
 
 const markOutForDelivery = async (tenantDB, order_id) => {
@@ -544,7 +539,6 @@ const verifyDeliveryOTP = async (tenantDB, order_id, otp) => {
   return { status: 1, message: "Order delivered successfully" };
 };
 
-
 const trackOrder = async (tenantDB, order_id) => {
   const res = await tenantDB.query(
     `SELECT status, message, created_at
@@ -557,6 +551,71 @@ const trackOrder = async (tenantDB, order_id) => {
   return { status: 1, data: res.rows };
 };
 
+const dashboardStats = async (tenantDB, period = "month") => {
+  try {
+    /* ---------------- SUMMARY ---------------- */
+    const summarySql = `
+      SELECT
+        COUNT(*) AS total_orders,
+        COALESCE(SUM(total_amount), 0) AS total_revenue,
+        COUNT(*) FILTER (WHERE order_status = 'Pending') AS pending_orders
+      FROM tbl_master_orders
+    `;
+
+    /* ---------------- REVENUE GRAPH ---------------- */
+    let groupBy = "";
+    let label = "";
+
+    if (period === "week") {
+      label = "day";
+      groupBy = "TO_CHAR(created_at, 'Dy')";
+    } else if (period === "year") {
+      label = "month";
+      groupBy = "TO_CHAR(created_at, 'Mon')";
+    } else {
+      // month (day-wise)
+      label = "date";
+      groupBy = "TO_CHAR(created_at, 'DD')";
+    }
+
+    const revenueSql = `
+      SELECT
+        ${groupBy} AS name,
+        SUM(total_amount) AS sales
+      FROM tbl_master_orders
+      GROUP BY name
+      ORDER BY name
+    `;
+
+    /* ---------------- RECENT ORDERS ---------------- */
+    const recentSql = `
+      SELECT
+        order_no,
+        total_amount,
+        order_status,
+        TO_CHAR(created_at, 'DD Mon, HH12:MI AM') AS time
+      FROM tbl_master_orders
+      ORDER BY created_at DESC
+      LIMIT 5
+    `;
+
+    const [summary, revenue, recent] = await Promise.all([
+      tenantDB.query(summarySql),
+      tenantDB.query(revenueSql),
+      tenantDB.query(recentSql),
+    ]);
+
+    return {
+      status: 1,
+      summary: summary.rows[0],
+      revenue: revenue.rows,
+      recent_orders: recent.rows,
+    };
+  } catch (error) {
+    console.error("Dashboard error:", error);
+    return { status: 0, message: "Dashboard fetch failed" };
+  }
+};
 
 // EXPORT DEFAULT
 export default {
@@ -568,5 +627,5 @@ export default {
   catitems,
   getuserorders,
   singleorddetail,
-  
+  dashboardStats,
 };
