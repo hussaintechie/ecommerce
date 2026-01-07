@@ -24,6 +24,8 @@ dotenv.config();
 
 const app = express();
 const server = http.createServer(app);
+
+
 app.use(cors({
   origin: function (origin, callback) {
     const allowedOrigins = [
@@ -43,13 +45,19 @@ app.use(cors({
   methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
   allowedHeaders: ["Content-Type", "Authorization"]
 }));
+app.options("*", cors());
 
 const io = new Server(server, {
   cors: {
-    origin: "*", // dev only
-    credentials: true,
+    origin: [
+      "https://admin.sribalajistores.com",
+      "https://user.sribalajistores.com"
+    ],
+    methods: ["GET", "POST"],
+    credentials: true
   }
 });
+
 
 io.on("connection", (socket) => {
   console.log("🔌 Admin connected:", socket.id);
