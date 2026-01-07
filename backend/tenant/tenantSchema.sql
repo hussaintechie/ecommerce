@@ -73,13 +73,6 @@ CREATE TABLE IF NOT EXISTS tmp_tbl_master_product (
 	product_status BOOLEAN,
 	stock int
 );
-<<<<<<< HEAD
-
-
-
-
-=======
->>>>>>> c82edc34afc245f3a1c7b11f3ea1a93b21158f1a
 CREATE TABLE IF NOT EXISTS tbl_master_orders (
     order_id SERIAL PRIMARY KEY,
     order_no VARCHAR(20) DEFAULT '',
@@ -178,74 +171,6 @@ create table IF NOT EXISTS tbl_master_order_items (
     discount_per NUMERIC(10,2) NOT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
-<<<<<<< HEAD
-insert into tbl_rollno_master(prefix ,lastrollid,nodigit) values ('ORD' ,1 ,4);
-insert into tbl_rollno_master(prefix ,lastrollid,nodigit) values ('FS' ,1 ,4);
-insert into tbl_rollno_master(prefix ,lastrollid,nodigit) values ('PUR' ,1 ,4);
-
-create table tbl_favorites (
-fav_id serial primary key,
-user_id int not null,
-product_id int not null,
-created_at timestamp default now(),
-unique(user_id,product_id)
-
-);
-
-create table IF NOT EXISTS tbl_flashsale_header (
-    flsh_trnid SERIAL PRIMARY KEY,
-	register_id INT NOT NULL,
-	flash_no VARCHAR(255),
-	from_datetime TIMESTAMP,
-	to_datetime TIMESTAMP,
-	created_userid INT ,
-	updated_userid INT ,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-	updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-
-create table IF NOT EXISTS tbl_flashsale_trans (
-    transid SERIAL PRIMARY KEY,
-	flsh_trnid INT NOT NULL,
-    product_id INT NOT NULL,
-    product_rate NUMERIC(10,2) NOT NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-	updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-
-CREATE TABLE  if not exists purchase_header (
-    purchaseid SERIAL PRIMARY KEY,
-    purchasedate DATE NOT NULL,
-    purchase_no VARCHAR(250) NOT NULL,
-    storeid INTEGER DEFAULT 0,
-    refrence VARCHAR(250),
-    cansts INTEGER DEFAULT 0,
-    created_at INTEGER DEFAULT 0,
-    updated_at INTEGER DEFAULT 0,
-    create_datetime TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_datetime TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-
-
-CREATE TABLE if not exists stock_transaction (
-    stocktrnid SERIAL PRIMARY KEY,
-    purchase_id INTEGER NOT NULL,
-    orderid INTEGER DEFAULT 0,
-    purchase_date DATE NOT NULL,
-    instoreid INTEGER DEFAULT 0,
-    outstoreid INTEGER DEFAULT 0,
-    itmid INTEGER NOT NULL,
-    itmname VARCHAR(250),
-    unitid INTEGER DEFAULT 0,
-    stockqty INTEGER DEFAULT 0,
-    rate NUMERIC(10,2) DEFAULT 0,
-    value NUMERIC(10,2) DEFAULT 0,
-    currentstock INTEGER DEFAULT 0,
-    itmcandel INTEGER DEFAULT 0,
-    canordersts INTEGER DEFAULT 0
-);
-
-=======
 
 
 
@@ -290,4 +215,12 @@ CREATE TABLE tbl_delivery_partner (
   status SMALLINT DEFAULT 1, -- 1 = active, 0 = inactive
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
->>>>>>> c82edc34afc245f3a1c7b11f3ea1a93b21158f1a
+CREATE TABLE tbl_customer_review (
+  review_id SERIAL PRIMARY KEY,
+  user_id INT NOT NULL UNIQUE,
+  rating INT CHECK (rating BETWEEN 1 AND 5),
+  tags TEXT[],
+  comment TEXT,
+  is_reviewed BOOLEAN DEFAULT TRUE,
+  created_at TIMESTAMP DEFAULT NOW()
+);
