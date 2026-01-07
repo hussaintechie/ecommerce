@@ -1082,19 +1082,6 @@ export const cancelPurchaseItem = async (req, res) => {
       });
     }
 
-export const markOutForDelivery = async (req, res) => {
-  try {
-    const { order_id } = req.body;
-    const register_id = req.user.register_id;
-
-    if (!order_id) {
-      return res.status(400).json({
-        status: 0,
-        message: "Order ID required",
-      });
-    }
-
-    // 🔹 GET TENANT DB
     const tenantQuery = `
       SELECT db_name 
       FROM tbl_tenant_databases 

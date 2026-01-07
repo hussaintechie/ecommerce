@@ -601,8 +601,6 @@ const Lowstockdetails = async (
   }
 };
 
-
-
 const catitems = async (tenantDB, store_id, cate_id) => {
 
   //   insert into tbl_product_images (product_id ,image_url)values(2,'C:\Users\Dell\Downloads\product_img\onion2.'),
@@ -631,11 +629,6 @@ ORDER BY itm.product_id`;
       data: result.rows
     };
 
-    let cateitmsql = `select * from tbl_master_product as itm where categories_id =${cate_id}`;
-
-    const result = await tenantDB.query(cateitmsql);
-
-    return { status: 1, message: "Items fetched", data: result.rows };
   } catch (error) {
     console.error("Items fetch error:", error);
     return { status: 0, message: "Items Fetch failed", error };
