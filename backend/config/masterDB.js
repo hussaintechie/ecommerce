@@ -8,7 +8,8 @@ const pool = new pg.Pool({
   password: process.env.DB_PASS,    // MUST be correct
   host: process.env.DB_HOST,
   port: process.env.DB_PORT,
-  database: process.env.DB_NAME,    // master DB
+  database: process.env.DB_NAME,
+  client_encoding: "UTF8",   // master DB
 });
 
 export default pool;
