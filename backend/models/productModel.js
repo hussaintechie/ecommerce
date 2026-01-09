@@ -1417,7 +1417,7 @@ const getDashboardDatas = async (tenantDB, chartmode, date) => {
     console.error("DashboardDatas fetch error:", error);
     return {
       status: 0,
-      message: "DashboardDatas Fetch failed",
+      message:err.message,
       error
     };
   }

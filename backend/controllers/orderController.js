@@ -252,3 +252,58 @@ export const orderdatas = async (req, res) => {
     });
   }
 };
+export const customerOrderList = async (req, res) => {
+  try {
+    const { limit = 10, page = 1 } = req.body;
+    const register_id = req.user.register_id;
+
+    if (!register_id) {
+      return res.status(400).json({
+        status: 0,
+        message: "Store ID required",
+      });
+    }
+
+    const offset = (page - 1) * limit;
+
+    // 🔹 Get tenant DB name
+    const tenantQuery = `
+      SELECT db_name 
+      FROM tbl_tenant_databases 
+      WHERE register_id = $1
+    `;
+
+    const result = await pool.query(tenantQuery, [register_id]);
+
+    if (result.rows.length === 0) {
+      return res.status(400).json({
+        status: 0,
+        message: "Store not found",
+      });
+    }
+
+    // 🔹 Create tenant DB connection
+    const tenantDB = getTenantPool(result.rows[0].db_name);
+
+    // ✅ CALL MODEL WITH VALID tenantDB
+    const data = await OrderModel.getCustomerOrders(
+      tenantDB,
+      Number(limit),
+      Number(offset)
+    );
+
+    return res.json({
+      status: 1,
+      message: "Customer orders fetched successfully",
+      data: data.rows,
+      total: data.total,
+    });
+
+  } catch (error) {
+    console.error("Customer order list error:", error);
+    return res.status(500).json({
+      status: 0,
+      message:error.message,
+    });
+  }
+};

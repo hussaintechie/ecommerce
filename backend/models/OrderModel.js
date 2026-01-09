@@ -33,15 +33,12 @@ const getuserorders = async (tenantDB, store_id, userid) => {
         status === "out_for_delivery"
       ) {
         data.processed.push(item);
-      } 
-      else if (status === "delivered") {
+      } else if (status === "delivered") {
         data.delivered.push(item);
-      } 
-      else if (status === "cancelled") {
+      } else if (status === "cancelled") {
         data.cancelled.push(item);
       }
     }
-
 
     return {
       status: 1,
@@ -53,7 +50,7 @@ const getuserorders = async (tenantDB, store_id, userid) => {
     return { status: 0, message: "Items Fetch failed", error };
   }
 };
- const singleorddetail = async (tenantDB, store_id, orderid) => {
+const singleorddetail = async (tenantDB, store_id, orderid) => {
   try {
     /* ---------------- ITEMS ---------------- */
     const userorderitmsql = `
@@ -124,14 +121,14 @@ GROUP BY
         name: info.customer_name,
         phone: info.customer_phone,
       },
-     billdetails: {
-  item_total: Number(info.item_total || 0),
-  handling_fee: Number(info.handling_fee || 0),
-  delivery_fee: Number(info.delivery_fee || 0),
-  discount: Number(info.discount_amount || 0),
-  total_amount: Number(info.total_amount || 0),
-  coupon_code: info.coupon_code || null
-},
+      billdetails: {
+        item_total: Number(info.item_total || 0),
+        handling_fee: Number(info.handling_fee || 0),
+        delivery_fee: Number(info.delivery_fee || 0),
+        discount: Number(info.discount_amount || 0),
+        total_amount: Number(info.total_amount || 0),
+        coupon_code: info.coupon_code || null,
+      },
 
       paydetails: {
         pay_mode: info.pay_method,
@@ -151,7 +148,7 @@ GROUP BY
     return { status: 0, message: "Order Fetch failed", error };
   }
 };
- const ordersubmit = async (
+const ordersubmit = async (
   tenantDB,
   user_id,
   address_delivery,
@@ -163,16 +160,15 @@ GROUP BY
   order_status,
   delivery_id,
   payment_status,
-  payment_method,          // ✅ ADD
-  razorpay_payment_id,     // ✅ ADD
-  razorpay_order_id,       // ✅ ADD
-  razorpay_signature, 
+  payment_method, // ✅ ADD
+  razorpay_payment_id, // ✅ ADD
+  razorpay_order_id, // ✅ ADD
+  razorpay_signature,
   items_details,
   coupon_code = null,
   coupon_discount = 0,
   first_order_discount = 0,
   coupon_id = null
-
 ) => {
   try {
     await tenantDB.query("BEGIN");
@@ -187,15 +183,12 @@ GROUP BY
     const nodigit = rollnores.rows[0]?.nodigit ?? 4;
 
     const order_no = `${prefix}${String(lastId + 1).padStart(nodigit, "0")}`;
-    
 
-// mark coupon used
-
-
+    // mark coupon used
 
     /* --------- INSERT ORDER --------- */
-   const orderRes = await tenantDB.query(
-  `
+    const orderRes = await tenantDB.query(
+      `
   INSERT INTO tbl_master_orders
   (
     order_no,
@@ -219,68 +212,62 @@ GROUP BY
   )
   RETURNING order_id
   `,
-  [
-    order_no,          // $1
-    user_id,           // $2
-    address_delivery,  // $3
-    total_amount,      // $4
-    handling_fee,      // $5
-    delivery_fee,      // $6 ✅ number
-    delivery_start,    // $7 ✅ timestamp
-    delivery_end,      // $8 ✅ timestamp
-    order_status,      // $9
-    delivery_id,       // $10
-    payment_status,    // $11
-  ]
-);
+      [
+        order_no, // $1
+        user_id, // $2
+        address_delivery, // $3
+        total_amount, // $4
+        handling_fee, // $5
+        delivery_fee, // $6 ✅ number
+        delivery_start, // $7 ✅ timestamp
+        delivery_end, // $8 ✅ timestamp
+        order_status, // $9
+        delivery_id, // $10
+        payment_status, // $11
+      ]
+    );
 
     const order_id = orderRes.rows[0].order_id;
     await tenantDB.query(
-  `
+      `
   UPDATE tbl_master_orders
   SET coupon_code = $1,
       coupon_discount = $2,
       first_order_discount = $3
   WHERE order_id = $4
   `,
-  [
-    coupon_code,
-    coupon_discount,
-    first_order_discount,
-    order_id
-  ]
-);
+      [coupon_code, coupon_discount, first_order_discount, order_id]
+    );
 
-// =====================
-// MARK COUPON USED
-// =====================
-console.log("Coupon Data:", {
-  coupon_id,
-  coupon_code,
-  coupon_discount
-});
+    // =====================
+    // MARK COUPON USED
+    // =====================
+    console.log("Coupon Data:", {
+      coupon_id,
+      coupon_code,
+      coupon_discount,
+    });
 
-let final_coupon_id = null;
+    let final_coupon_id = null;
 
-if (coupon_code) {
-  const res = await tenantDB.query(
-    `SELECT coupon_id FROM tbl_coupons WHERE coupon_code = $1`,
-    [coupon_code]
-  );
+    if (coupon_code) {
+      const res = await tenantDB.query(
+        `SELECT coupon_id FROM tbl_coupons WHERE coupon_code = $1`,
+        [coupon_code]
+      );
 
-  if (res.rowCount > 0) {
-    final_coupon_id = res.rows[0].coupon_id;
-  }
-}
+      if (res.rowCount > 0) {
+        final_coupon_id = res.rows[0].coupon_id;
+      }
+    }
 
-if (final_coupon_id) {
-  await tenantDB.query(
-    `INSERT INTO tbl_coupon_usage (coupon_id, user_id, order_id)
+    if (final_coupon_id) {
+      await tenantDB.query(
+        `INSERT INTO tbl_coupon_usage (coupon_id, user_id, order_id)
      VALUES ($1, $2, $3)`,
-    [final_coupon_id, user_id, order_id]
-  );
-}
-
+        [final_coupon_id, user_id, order_id]
+      );
+    }
 
     /* --------- UPDATE ROLL --------- */
     await tenantDB.query(
@@ -318,13 +305,12 @@ if (final_coupon_id) {
         ]
       );
     }
-   // PAYMENT STATUS FOR DB
-const paymentDbStatus =
-  payment_method === "COD" ? "PENDING" : "SUCCESS";
+    // PAYMENT STATUS FOR DB
+    const paymentDbStatus = payment_method === "COD" ? "PENDING" : "SUCCESS";
 
-// INSERT PAYMENT
-await tenantDB.query(
-  `
+    // INSERT PAYMENT
+    await tenantDB.query(
+      `
   INSERT INTO tbl_master_payment
   (
     order_id,
@@ -335,14 +321,14 @@ await tenantDB.query(
   )
   VALUES ($1,$2,$3,$4,$5)
   `,
-  [
-    order_id,
-    payment_method === "COD" ? "COD" : payment_method,
-    paymentDbStatus,
-    razorpay_payment_id || null,     // ✅ transaction_id
-    razorpay_order_id || null        // ✅ external_payment_id
-  ]
-);
+      [
+        order_id,
+        payment_method === "COD" ? "COD" : payment_method,
+        paymentDbStatus,
+        razorpay_payment_id || null, // ✅ transaction_id
+        razorpay_order_id || null, // ✅ external_payment_id
+      ]
+    );
 
     /* --------- ORDER TRACKING --------- */
     await tenantDB.query(
@@ -361,14 +347,13 @@ await tenantDB.query(
       order_no,
       order_id,
     };
-
   } catch (error) {
     await tenantDB.query("ROLLBACK");
     console.error("Order save error:", error);
     return { status: 0, message: "Order save failed" };
   }
 };
- const orderdataget = async (tenantDB, store_id, limit, offset, searchtxt) => {
+const orderdataget = async (tenantDB, store_id, limit, offset, searchtxt) => {
   try {
     const dataSql = `
      SELECT 
@@ -419,23 +404,69 @@ LIMIT $1 OFFSET $2;
 
     const [dataRes, countRes] = await Promise.all([
       tenantDB.query(dataSql, [limit, offset]),
-      tenantDB.query(countSql)
+      tenantDB.query(countSql),
     ]);
 
     return {
       status: 1,
       data: dataRes.rows,
-      total: Number(countRes.rows[0].count)
+      total: Number(countRes.rows[0].count),
     };
   } catch (error) {
     console.error("Order fetch error:", error);
     return { status: 0, message: "Fetch failed" };
   }
 };
-export default
-{
+const getCustomerOrders = async (tenantDB, limit, offset) => {
+  const sql = `
+    SELECT 
+      o.order_id,
+      o.order_no,
+      o.total_amount,
+      o.order_status,
+      o.payment_status,
+      r.rating,
+      o.created_at,
+      a.name AS customer_name,
+      COALESCE(SUM(i.product_qty), 0) AS item_count
+    FROM tbl_master_orders o
+    LEFT JOIN tbl_master_order_items i 
+      ON o.order_id = i.order_id
+    LEFT JOIN tbl_address a
+      ON o.user_id = a.user_id
+    LEFT JOIN tbl_customer_review r
+      ON o.user_id = r.user_id
+    GROUP BY 
+      o.order_id,
+      o.order_no,
+      o.total_amount,
+      o.order_status,
+      o.payment_status,
+      o.created_at,
+      a.name,
+      r.rating
+    ORDER BY o.created_at DESC
+    LIMIT $1 OFFSET $2
+  `;
+
+  const countSql = `SELECT COUNT(*) FROM tbl_master_orders`;
+
+  const [dataRes, countRes] = await Promise.all([
+    tenantDB.query(sql, [limit, offset]),
+    tenantDB.query(countSql),
+  ]);
+
+  return {
+    rows: dataRes.rows,
+    total: Number(countRes.rows[0].count),
+  };
+};
+
+
+export default {
   getuserorders,
   singleorddetail,
   orderdataget,
   ordersubmit,
-}
+  getCustomerOrders,
+};

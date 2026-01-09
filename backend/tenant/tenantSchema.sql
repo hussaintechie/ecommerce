@@ -134,8 +134,6 @@ CREATE TABLE IF NOT EXISTS tbl_product_images (
     image_url TEXT NOT NULL,
     created_at TIMESTAMP DEFAULT NOW()
 );
-<<<<<<< HEAD
-=======
 
 create table tbl_favorites (
 fav_id serial primary key,
@@ -145,7 +143,6 @@ created_at timestamp default now(),
 unique(user_id,product_id)
 
 );
->>>>>>> c82edc34afc245f3a1c7b11f3ea1a93b21158f1a
 CREATE TABLE IF NOT EXISTS tbl_rollno_master (
     rollid SERIAL PRIMARY KEY,
     prefix VARCHAR(50) NOT NULL,
@@ -219,4 +216,21 @@ CREATE TABLE tbl_customer_review (
   comment TEXT,
   is_reviewed BOOLEAN DEFAULT TRUE,
   created_at TIMESTAMP DEFAULT NOW()
+);
+CREATE TABLE if not exists stock_transaction (
+    stocktrnid SERIAL PRIMARY KEY,
+    purchase_id INTEGER NOT NULL,
+    orderid INTEGER DEFAULT 0,
+    purchase_date DATE NOT NULL,
+    instoreid INTEGER DEFAULT 0,
+    outstoreid INTEGER DEFAULT 0,
+    itmid INTEGER NOT NULL,
+    itmname VARCHAR(250),
+    unitid INTEGER DEFAULT 0,
+    stockqty INTEGER DEFAULT 0,
+    rate NUMERIC(10,2) DEFAULT 0,
+    value NUMERIC(10,2) DEFAULT 0,
+    currentstock INTEGER DEFAULT 0,
+    itmcandel INTEGER DEFAULT 0,
+    canordersts INTEGER DEFAULT 0
 );
