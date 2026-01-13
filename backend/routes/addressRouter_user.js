@@ -47,7 +47,7 @@ export default router;
 //   "is_default": true
 // }
 ///////////////////////
-// http://localhost:5000/address/edit/5
+// https://api.sribalajistores.com/address/edit/5
 
 // {
 //   "user_id": 12,
@@ -57,8 +57,8 @@ export default router;
 //   "street": "Anna Salai"
 // }
 ///////////////////////
-// http://localhost:5000/user/list?user_id=4&store_id=2
+// https://api.sribalajistores.com/user/list?user_id=4&store_id=2
 
 ///
 ///
-///http://localhost:5000/user/details/1?user_id=4&store_id=2
+///https://api.sribalajistores.com/user/details/1?user_id=4&store_id=2

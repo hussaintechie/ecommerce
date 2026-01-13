@@ -30,7 +30,8 @@ app.use(cors({
       "https://user.sribalajistores.com",
       "https://api.sribalajistores.com",
       "http://localhost:8081",
-      "https://admin.sribalajistores.com"
+      "https://admin.sribalajistores.com",
+      "http://localhost:5173"
     ];
 
     if (!origin || allowedOrigins.includes(origin)) {

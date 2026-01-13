@@ -78,101 +78,186 @@ export const adminRegister = async (req, res) => {
 // LOGIN WITH PHONE + OTP
 // ==========================================
 
-// Generate OTP
-const generateOTP = () => Math.floor(100000 + Math.random() * 900000);
+//Generate OTP
+const generateOTP = () =>
+  Math.floor(100000 + Math.random() * 900000);
 
-// SEND SMS (same)
-const sendSMS = async (phone, otp) => {
-  if (process.env.NODE_ENV !== "production") {
-    console.log(`DEV MODE OTP for ${phone} →`, otp);
-    return true;
-  }
+const sendSMS = async (phone, otp, type = "login") => {
+  const mobile = phone.toString().replace(/\D/g, "");
 
-  const url = "https://www.fast2sms.com/dev/bulkV2";
+  const templates = {
+    login: "1107176665585410267",
+    delivery: "1107176587863102937",
+  };
 
-  await axios.post(url, {
-      route: "v3",
-      sender_id: "TXTIND",
-      message: `Your OTP is ${otp}`,
-      language: "english",
-      numbers: phone
+  const response = await axios.post(
+    "https://www.fast2sms.com/dev/bulkV2",
+    {
+      route: "dlt",
+      sender_id: "BLJSTR",
+      entity_id: "1101607620000090923",   // REQUIRED
+      template_id: templates[type],
+      variables_values: String(otp),     // ONLY OTP
+      numbers: mobile,
     },
-    { headers: { authorization: process.env.FAST2SMS_API_KEY } }
+    {
+      headers: {
+        authorization: process.env.FAST2SMS_API_KEY,
+        "Content-Type": "application/json",
+      },
+    }
   );
+
+  console.log("FAST2SMS RESPONSE >>>", response.data);
+
+  if (response.data?.return !== true) {
+    throw new Error(response.data?.message || "OTP failed");
+  }
 
   return true;
 };
 
-// LOGIN CONTROLLER (WITH JWT)
+
+
+
+
+
+
+
+
+
 export const login = async (req, res) => {
   try {
     const { phone, otp, sendOtp } = req.body;
 
-    if (!phone) return res.status(400).json({ message: "Phone required" });
+    if (!phone) {
+      return res.status(400).json({
+        status: 0,
+        message: "Phone required",
+      });
+    }
 
-    // Step 1 → Send OTP
+    /* ================= SEND OTP ================= */
     if (sendOtp) {
       const newOtp = generateOTP();
+      const expiry = new Date(Date.now() + 5 * 60 * 1000); // 5 minutes
 
       const userCheck = await pool.query(
-        "SELECT * FROM tbl_login WHERE phone=$1",
+        "SELECT user_id, register_id FROM tbl_login WHERE phone=$1",
         [phone]
       );
 
-      if (userCheck.rows.length === 0) {
-        const store = await pool.query(`SELECT register_id FROM tbl_register LIMIT 1`);
+      let finalRegisterId;
+
+      if (userCheck.rows.length > 0) {
+        // ✅ Existing user → update OTP
+        finalRegisterId = userCheck.rows[0].register_id;
 
         await pool.query(
-          `INSERT INTO tbl_login (phone, otp, user_role, register_id)
-           VALUES ($1,$2,$3,$4)`,
-          [phone, newOtp, "user", store.rows[0].register_id]
+          `UPDATE tbl_login 
+           SET otp=$1, otp_expiry=$2 
+           WHERE phone=$3`,
+          [newOtp, expiry, phone]
         );
       } else {
-        await pool.query("UPDATE tbl_login SET otp=$1 WHERE phone=$2", [newOtp, phone]);
+        // ✅ New user → assign default store
+        const store = await pool.query(
+          `SELECT register_id 
+           FROM tbl_register 
+           WHERE is_default=true 
+           LIMIT 1`
+        );
+
+        if (!store.rows.length) {
+          return res.status(400).json({
+            status: 0,
+            message: "No default store configured",
+          });
+        }
+
+        finalRegisterId = store.rows[0].register_id;
+
+        await pool.query(
+          `INSERT INTO tbl_login 
+           (phone, otp, otp_expiry, user_role, register_id)
+           VALUES ($1,$2,$3,'user',$4)`,
+          [phone, newOtp, expiry, finalRegisterId]
+        );
       }
 
       await sendSMS(phone, newOtp);
 
-      return res.json({ status: 1, message: "OTP sent" });
+      return res.json({
+        status: 1,
+        message: "OTP sent successfully",
+      });
     }
 
-    // Step 2 → Verify OTP
-    if (!otp) return res.status(400).json({ message: "OTP required" });
+    /* ================= VERIFY OTP ================= */
+    if (!otp) {
+      return res.status(400).json({
+        status: 0,
+        message: "OTP required",
+      });
+    }
 
     const result = await pool.query(
-      "SELECT * FROM tbl_login WHERE phone=$1 AND otp=$2",
+      `SELECT * FROM tbl_login
+       WHERE phone=$1 
+       AND otp=$2 
+       AND otp_expiry > NOW()`,
       [phone, otp]
     );
 
-    if (result.rows.length === 0)
-      return res.status(400).json({ message: "Incorrect OTP" });
+    if (result.rows.length === 0) {
+      return res.status(401).json({
+        status: 0,
+        message: "Invalid or expired OTP",
+      });
+    }
 
     const user = result.rows[0];
 
     // Clear OTP
-    await pool.query("UPDATE tbl_login SET otp=NULL WHERE phone=$1", [phone]);
+    await pool.query(
+      `UPDATE tbl_login 
+       SET otp=NULL, otp_expiry=NULL 
+       WHERE phone=$1`,
+      [phone]
+    );
 
-    // Admin → Attach DB
+    // Attach tenant DB for admin
     if (user.user_role === "admin") {
       const tenant = await pool.query(
         "SELECT db_name FROM tbl_tenant_databases WHERE register_id=$1",
         [user.register_id]
       );
-      user.tenant_db = tenant.rows[0]?.db_name;
+      user.tenant_db = tenant.rows[0]?.db_name || null;
     }
 
-    // 🎉 GENERATE JWT TOKEN HERE
-    const token = generateToken(user);
+    // Generate JWT
+    const token = generateToken({
+      user_id: user.user_id,
+      register_id: user.register_id,
+      role: user.user_role,
+    });
 
     return res.json({
       status: 1,
-      message: "Login success",
+      message: "Login successful",
       token,
-      user
+      user: {
+        user_id: user.user_id,
+        register_id: user.register_id,
+        role: user.user_role,
+        tenant_db: user.tenant_db || null,
+      },
     });
-
   } catch (err) {
     console.error("Login Error:", err);
-    return res.status(500).json({ message: "Login failed" });
+    return res.status(500).json({
+      status: 0,
+      message: err.message,
+    });
   }
 };

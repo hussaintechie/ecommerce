@@ -16,7 +16,7 @@ CREATE TABLE tbl_login (
     phone VARCHAR(26),
     user_role VARCHAR(10) CHECK (user_role IN ('admin','user')) NOT NULL DEFAULT 'user',
     is_first_login BOOLEAN DEFAULT TRUE,
-    
+    otp_expiry TIMESTAMP,
     created_at TIMESTAMP DEFAULT NOW(),
 
     CONSTRAINT fk_login_register FOREIGN KEY (register_id)

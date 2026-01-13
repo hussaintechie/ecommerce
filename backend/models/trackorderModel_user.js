@@ -18,6 +18,7 @@ export const markOutForDeliveryModel = async (tenantDB, order_id) => {
 
   return { status: 1, message: "Order marked out for delivery" };
 };
+
 export const generateDeliveryOTPModel = async (tenantDB, order_id) => {
   const otp = Math.floor(100000 + Math.random() * 900000).toString();
 
@@ -80,6 +81,7 @@ export const verifyDeliveryOTPModel = async (tenantDB, order_id, otp) => {
 
   return { status: 1, message: "Order delivered successfully" };
 };
+
 export const trackOrderModel = async (tenantDB, order_id) => {
   const res = await tenantDB.query(
     `
@@ -93,4 +95,6 @@ export const trackOrderModel = async (tenantDB, order_id) => {
 
   return { status: 1, data: res.rows };
 };
+
+
 
