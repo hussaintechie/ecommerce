@@ -119,110 +119,8 @@ const bulkuploaditm = async (tenantDB, fullqry) => {
     return { status: 0, message: "Upload failed", error };
   }
 };
-const orderdataget = async (tenantDB, store_id, limit, offset, searchtxt) => {
-  //   {
-  // "store_id" :1,
-  // "limit" :20,
-  // "offset" :0,
-  // "searchtxt":"hai",
-  // "fromdate":"2025-01-02",
-  // "todate":"2025-11-30"
-  // } api request
-
-  try {
-    const productsql = `
-      SELECT 
-        r.order_no,
-        r.total_amount,
-        COALESCE('tesat','') AS client,
-        r.payment_status,
-        r.order_status,
-        d.delivery_mode,
-        TO_CHAR(r.created_at, 'DD-MM-YYYY HH12:MI AM') AS created_at
-      FROM tbl_master_orders r
-      INNER JOIN tbl_delivery_modes d ON r.delivery_id = d.delivery_id
-      ORDER BY r.created_at DESC
-      LIMIT $1 OFFSET $2;
-    `;
-
-    const result = await tenantDB.query(productsql, [limit, offset]);
-
-    return { status: 1, message: "Order fetched", data: result.rows };
-
-  } catch (error) {
-    console.error("Order fetch error:", error);
-    return { status: 0, message: "Fetch failed", error };
-  }
-};
-const ordersubmit = async (
-  tenantDB, store_id, user_id, address_delivery, total_amount,
-  order_status, delivery_id, payment_status, items_details
-) => {
-  try {
-
-    // Roll number query
-    const rollnosql = `SELECT * FROM tbl_rollno_master WHERE rollid = 1`;
-    const rollnores = await tenantDB.query(rollnosql);
-
-    const prefix = rollnores.rows[0]?.prefix ?? '';
-    const rollid = rollnores.rows[0]?.lastrollid ?? 0;
-    const nodigit = rollnores.rows[0]?.nodigit ?? 2;
-
-    const suffix = rollid.toString().padStart(nodigit, '0');
-    const rollnum = prefix + suffix;
-
-    // Insert into order master
-    const ordsql = `
-      INSERT INTO tbl_master_orders 
-      (order_no, user_id, address_delivery, total_amount, order_status, delivery_id, payment_status)
-      VALUES ($1, $2, $3, $4, $5, $6, $7)
-      RETURNING order_id
-    `;
-
-    const orderRes = await tenantDB.query(ordsql, [
-      rollnum,
-      user_id,
-      address_delivery,
-      total_amount,
-      order_status,
-      delivery_id,
-      payment_status
-    ]);
-
-    const order_id = orderRes.rows[0].order_id;
-
-    await tenantDB.query(`UPDATE tbl_rollno_master SET lastrollid = lastrollid + 1 WHERE rollid = 1`);
-    // Insert order items
-    for (const item of items_details) {
-      const itemSql = `
-        INSERT INTO tbl_master_order_items 
-        (order_id, product_id, product_name, product_unit, product_qty, product_rate, product_amount, discount_amt, discount_per)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8 ,$9)
-      `;
-
-      await tenantDB.query(itemSql, [
-        order_id,
-        item.product_id,
-        item.product_name,
-        item.product_unit,
-        item.product_qty,
-        item.product_rate,
-        item.product_amount,
-        item.discount_amt,
-        item.discount_per
-      ]);
-    }
-
-    // Update roll number
 
 
-    return { status: 1, message: "Order Saved Successfully", order_no: rollnum, order_id };
-
-  } catch (error) {
-    console.error("Order save error:", error);
-    return { status: 0, message: "Order save failed", error };
-  }
-};
 
 const allcatedetails = async (tenantDB, store_id, mode_fetchorall, cate_id) => {
   try {
@@ -266,8 +164,8 @@ const Optionitems = async (tenantDB, store_id,) => {
     let itmsql = `  SELECT DISTINCT ON (itm.product_id)
         itm.product_id AS item_id,
         itm.title AS item_name,
-		 um.unitid as unit_id,
-		 um.unitname as unit_name,
+     um.unitid as unit_id,
+     um.unitname as unit_name,
         itm.price as rate
       FROM tbl_master_product itm
       inner join unitofmeasure_master as um on itm.unit = um.unitid	`;
@@ -417,8 +315,6 @@ const Lowstockdetails = async (
   }
 };
 
-
-
 const catitems = async (tenantDB, store_id, cate_id) => {
 
   //   insert into tbl_product_images (product_id ,image_url)values(2,'C:\Users\Dell\Downloads\product_img\onion2.'),
@@ -522,6 +418,7 @@ const Itemslist = async (tenantDB, store_id, page, limit, search) => {
   }
 };
 
+<<<<<<< HEAD
 const getuserorders = async (tenantDB, store_id, userid) => {
   try {
     const userordersql = `
@@ -620,6 +517,8 @@ export const singleorddetail = async (req, res) => {
   }
 };
 
+=======
+>>>>>>> d91528749cd110649743ae520072d0ea43554de2
 
 const getsuperdealsmodel = async (tenantDB) => {
 
@@ -1619,7 +1518,7 @@ const getDashboardDatas = async (tenantDB, chartmode, date) => {
     console.error("DashboardDatas fetch error:", error);
     return {
       status: 0,
-      message: "DashboardDatas Fetch failed",
+      message:err.message,
       error
     };
   }
@@ -1758,18 +1657,18 @@ const getChartdetails = async (tenantDB, chartmode) => {
   }
 };
 
+// productmodel.js
+
+
+
 
 
 // EXPORT DEFAULT
 export default {
   neweditcat,
   bulkuploaditm,
-  orderdataget,
-  ordersubmit,
   allcatedetails,
   catitems,
-  getuserorders,
-  singleorddetail,
   getsuperdealsmodel,
   flashsalemodel,
   getflashsale,
@@ -1787,6 +1686,3 @@ export default {
   getDashboardDatas,
   getChartdetails,
 };
-
-
-

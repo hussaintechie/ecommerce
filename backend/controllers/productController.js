@@ -1,7 +1,22 @@
 import pool from "../config/masterDB.js";
 import XLSX from "xlsx";
 import { getTenantPool } from "../config/tenantDB.js";
-import productmodel from "../models/productModel.js"
+import productmodel from "../models/productModel.js";
+import crypto from "crypto";
+
+// -----------------------------
+// Razorpay Signature Validation
+// -----------------------------
+function isValidRazorpaySignature(orderId, paymentId, signature) {
+  const body = `${orderId}|${paymentId}`;
+
+  const expected = crypto
+    .createHmac("sha256", process.env.RAZORPAY_SECRET)
+    .update(body)
+    .digest("hex");
+
+  return expected === signature;
+}
 
 export const addCategoryProduct = async (req, res) => {
   try {
@@ -230,6 +245,7 @@ export const createitmfile = async (req, res) => {
   }
 };
 
+<<<<<<< HEAD
 export const orderdatas = async (req, res) => {
   try {
     const { limit = 10, offset = 0 } = req.body;
@@ -284,87 +300,15 @@ export const orderdatas = async (req, res) => {
 
 
 export const submitorder = async (req, res) => {
+=======
 
-// {
-//   "register_id": 1,
-//   "product_id": 12,
-//   "user_id": 3,
-//   "address_delivery": "72/1 ,siruvadi",
-//   "total_amount": 238,
-//   "order_status": "Pending",
-//   "delivery_id": 2,
-//   "payment_status": "Failed",
-//   "items_details": [
-//     {
-//       "product_id": 2,
-//       "product_name": "Test",
-//       "product_qty": 35,
-//       "product_unit": 4,
-//       "product_rate": 46,
-//       "product_amount": 98,
-//       "discount_amt": 56,
-//       "discount_per": 40
-//     },
-//     {
-//       "product_id": 4,
-//       "product_name": "Sample",
-//       "product_qty": 10,
-//       "product_unit": 1,
-//       "product_amount": 98,
-//       "product_rate": 80,
-//       "discount_amt": 10,
-//       "discount_per": 5
-//     }
-//   ]
-// }
 
-  try {
-    const {address_delivery ,total_amount ,order_status ,delivery_id ,payment_status ,items_details} = req.body;
-    const register_id=req.user.register_id
-    const user_id=req.user.user_id
 
-    if (!register_id) {
-      return res.status(400).json({
-        status: 0,
-        message: "Store ID required",
-      });
-    }
-    if (!items_details) {
-      return res.status(400).json({
-        status: 0,
-        message: "Product Details required",
-      });
-    }
+>>>>>>> d91528749cd110649743ae520072d0ea43554de2
 
-    // Get Customer DB name (tenant)
-    const tenantQuery = `
-      SELECT db_name 
-      FROM tbl_tenant_databases 
-      WHERE register_id = $1
-    `;
 
-    const result = await pool.query(tenantQuery, [register_id]);
 
-    if (result.rows.length === 0) {
-      return res.status(400).json({ status: 0, message: "Store not found" });
-    }
 
-    const tenantDB = getTenantPool(result.rows[0].db_name);
-
-    // Call model function
-    const orderdatares = await productmodel.ordersubmit(tenantDB,register_id,user_id ,address_delivery ,total_amount ,order_status ,delivery_id ,payment_status,items_details);
-
-    return res.status(200).json(orderdatares);
-
-  } catch (err) {
-    console.error("Order data get Error:", err);
-    return res.status(500).json({
-      status: 0,
-      message: "Server Error",
-      error: err.message,
-    });
-  }
-};
 
 
 export const allcatedetails = async (req, res) => {
@@ -648,110 +592,8 @@ export const saveItem = async (req, res) => {
   }
 };
 
-export const getuserorders = async (req, res) => {
-
-// {
-//   "register_id": 1,
-//   "userid": 3
-// }
-  try {
-    const  userid = req.user.user_id;
-    const register_id=req.user.register_id
-
-    if (!register_id) {
-      return res.status(400).json({
-        status: 0,
-        message: "Store ID required",
-      });
-    }
-    if (!userid) {
-      return res.status(400).json({
-        status: 0,
-        message: "User ID required",
-      });
-    }
 
 
-    // Get Customer DB name (tenant)
-    const tenantQuery = `
-      SELECT db_name 
-      FROM tbl_tenant_databases 
-      WHERE register_id = $1
-    `;
-
-    const result = await pool.query(tenantQuery, [register_id]);
-
-    if (result.rows.length === 0) {
-      return res.status(400).json({ status: 0, message: "Store not found" });
-    }
-
-    const tenantDB = getTenantPool(result.rows[0].db_name);
-
-    // Call model function
-    const userorderres = await productmodel.getuserorders(tenantDB,register_id ,userid);
-
-    return res.status(200).json(userorderres);
-
-  } catch (err) {
-    console.error("user order data get Error:", err);
-    return res.status(500).json({
-      status: 0,
-      message: "Server Error",
-      error: err.message,
-    });
-  }
-};
-export const singleorddetail = async (req, res) => {
-// {
-//   "register_id": 1,
-//   "orderid": 3
-// }
-  try {
-    const {orderid} = req.body;
-   const register_id=req.user.register_id
-    if (!register_id) {
-      return res.status(400).json({
-        status: 0,
-        message: "Store ID required",
-      });
-    }
-    if (!orderid) {
-      return res.status(400).json({
-        status: 0,
-        message: "Order ID required",
-      });
-    }
-
-
-    // Get Customer DB name (tenant)
-    const tenantQuery = `
-      SELECT db_name 
-      FROM tbl_tenant_databases 
-      WHERE register_id = $1
-    `;
-
-    const result = await pool.query(tenantQuery, [register_id]);
-
-    if (result.rows.length === 0) {
-      return res.status(400).json({ status: 0, message: "Store not found" });
-    }
-
-    const tenantDB = getTenantPool(result.rows[0].db_name);
-
-    // Call model function
-    const userorderres = await productmodel.singleorddetail(tenantDB,register_id ,orderid);
-
-    return res.status(200).json(userorderres);
-
-  } catch (err) {
-    console.error("order data get Error:", err);
-    return res.status(500).json({
-      status: 0,
-      message: "Server Error",
-      error: err.message,
-    });
-  }
-};
 export const getsuperdeals = async (req, res) => {
 
 // {
@@ -1341,6 +1183,137 @@ export const getChartdetails = async (req, res) => {
   }
 };
 
+export const verifyDeliveryOTP = async (req, res) => {
+  try {
+    const { order_id, otp } = req.body;
+    const register_id = req.user.register_id;
 
+    if (!order_id || !otp) {
+      return res.status(400).json({
+        status: 0,
+        message: "Order ID and OTP required",
+      });
+    }
 
+    // 🔹 GET TENANT DB
+    const tenantQuery = `
+      SELECT db_name 
+      FROM tbl_tenant_databases 
+      WHERE register_id = $1
+    `;
+    const result = await pool.query(tenantQuery, [register_id]);
+
+    if (result.rows.length === 0) {
+      return res.status(400).json({
+        status: 0,
+        message: "Store not found",
+      });
+    }
+
+    const tenantDB = getTenantPool(result.rows[0].db_name);
+
+    // 🔹 CALL MODEL
+    const response = await productmodel.verifyDeliveryOTP(
+      tenantDB,
+      order_id,
+      otp
+    );
+
+    return res.status(200).json(response);
+  } catch (err) {
+    console.error("verifyDeliveryOTP error:", err);
+    return res.status(500).json({
+      status: 0,
+      message: "Server error",
+      error: err.message,
+    });
+  }
+};
+
+export const trackOrder = async (req, res) => {
+  try {
+    const { order_id } = req.body;
+    const register_id = req.user.register_id;
+
+    if (!order_id) {
+      return res.status(400).json({
+        status: 0,
+        message: "Order ID required",
+      });
+    }
+
+    // 🔹 GET TENANT DB
+    const tenantQuery = `
+      SELECT db_name 
+      FROM tbl_tenant_databases 
+      WHERE register_id = $1
+    `;
+    const result = await pool.query(tenantQuery, [register_id]);
+
+    if (result.rows.length === 0) {
+      return res.status(400).json({
+        status: 0,
+        message: "Store not found",
+      });
+    }
+
+    const tenantDB = getTenantPool(result.rows[0].db_name);
+
+    // 🔹 CALL MODEL
+    const response = await productmodel.trackOrder(tenantDB, order_id);
+
+    return res.status(200).json(response);
+  } catch (err) {
+    console.error("trackOrder error:", err);
+    return res.status(500).json({
+      status: 0,
+      message: "Server error",
+      error: err.message,
+    });
+  }
+};
+export const getDeliveryOrderDetails = async (req, res) => {
+  try {
+    const { orderId } = req.params;
+    const register_id = req.user.register_id;
+
+    if (!orderId) {
+      return res.status(400).json({ status: 0, message: "Order ID required" });
+    }
+
+    const tenantRes = await pool.query(
+      `SELECT db_name FROM tbl_tenant_databases WHERE register_id = $1`,
+      [register_id]
+    );
+
+    if (!tenantRes.rowCount) {
+      return res.status(404).json({ status: 0, message: "Store not found" });
+    }
+
+    const tenantDB = getTenantPool(tenantRes.rows[0].db_name);
+
+    const query = `
+      SELECT 
+        o.order_id,
+        a.name,
+        a.phone,
+        a.full_address
+      FROM tbl_master_orders o
+      JOIN tbl_address a ON a.user_id = o.user_id
+      WHERE o.user_id = $1
+    `;
+
+    const result = await tenantDB.query(query, [orderId]);
+
+    if (!result.rowCount) {
+      return res.status(404).json({ status: 0, message: "Order not found" });
+    }
+
+    return res.json({ status: 1, data: result.rows[0] });
+
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ status: 0, message: "Server error" });
+  }
+};
 

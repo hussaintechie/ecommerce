@@ -8,7 +8,7 @@ import {
   getDeliveryOrderDetails
 } from "../controllers/deliveryPartnerController.js";
 
-import { singleorddetail } from "../controllers/productController.js";
+import { singleorddetail } from "../controllers/orderController.js";
 import { auth } from "../middleware/authMiddleware.js";
 
 const router = express.Router();
