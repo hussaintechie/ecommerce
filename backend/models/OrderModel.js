@@ -28,7 +28,7 @@ const getuserorders = async (tenantDB, store_id, userid) => {
       const status = item.order_status?.toLowerCase();
 
       if (
-        status === "process" ||
+        status === "pending" || status === "process" ||
         status === "pending" ||
         status === "out_for_delivery"
       ) {
@@ -377,11 +377,12 @@ FROM tbl_master_orders r
 INNER JOIN tbl_delivery_modes d 
   ON r.delivery_id = d.delivery_id
 
-INNER JOIN tbl_address t 
-  ON t.user_id = r.user_id
+LEFT JOIN tbl_address t 
+  ON t.user_id = r.user_id   -- ✅ FIXED
 
 LEFT JOIN tbl_master_order_items i 
   ON i.order_id = r.order_id
+
 
 GROUP BY
   r.order_id,

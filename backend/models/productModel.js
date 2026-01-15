@@ -418,7 +418,6 @@ const Itemslist = async (tenantDB, store_id, page, limit, search) => {
   }
 };
 
-<<<<<<< HEAD
 const getuserorders = async (tenantDB, store_id, userid) => {
   try {
     const userordersql = `
@@ -517,8 +516,6 @@ export const singleorddetail = async (req, res) => {
   }
 };
 
-=======
->>>>>>> d91528749cd110649743ae520072d0ea43554de2
 
 const getsuperdealsmodel = async (tenantDB) => {
 

@@ -21,16 +21,12 @@ import couponRoutes from "./routes/couponRoutes.js";
 import dashboardRoutes from "./routes/dashboardRoutes.js";
 import deliveryPartnerModel from "./routes/deliveryPartnerRoutes.js";
 import reviewRoutes from "./routes/review.js";
-<<<<<<< HEAD
-=======
 import orderRouter from "./routes/orderRouter.js";
 
->>>>>>> d91528749cd110649743ae520072d0ea43554de2
 dotenv.config();
 
 const app = express();
 const server = http.createServer(app);
-<<<<<<< HEAD
 app.use(cors({
   origin: function (origin, callback) {
     const allowedOrigins = [
@@ -51,47 +47,6 @@ app.use(cors({
   methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
   allowedHeaders: ["Content-Type", "Authorization"]
 }));
-=======
-
-/* =========================
-   MIDDLEWARE
-========================= */
-
-// Body parser
-app.use(express.json());
-
-// ✅ CORS (DEV + PROD SAFE)
-app.use(
-  cors({
-    origin: (origin, callback) => {
-      const allowedOrigins = [
-        "https://user.sribalajistores.com",
-        "https://api.sribalajistores.com",
-        "https://admin.sribalajistores.com",
-        "http://localhost:8081",
-        "http://localhost:5173" // Vite dev
-      ];
-
-      // Allow Postman, curl, mobile apps
-      if (!origin) return callback(null, true);
-
-      if (allowedOrigins.includes(origin)) {
-        return callback(null, true);
-      }
-
-      console.error("🚫 Blocked by CORS:", origin);
-      callback(new Error("CORS not allowed"));
-    },
-    credentials: true,
-    methods: ["GET", "POST", "PUT", "DELETE"],
-    allowedHeaders: ["Content-Type", "Authorization"]
-  })
-);
-
-/* =========================
-   SOCKET.IO
-========================= */
->>>>>>> d91528749cd110649743ae520072d0ea43554de2
 
 const io = new Server(server, {
   cors: {
@@ -114,7 +69,8 @@ io.on("connection", (socket) => {
 
 // Export io for routes/controllers
 export { io };
-
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 /* =========================
    ROUTES
 ========================= */
@@ -126,17 +82,10 @@ app.get("/", (req, res) => {
 app.use("/api/payment", paymentRoutes);
 app.use("/ruser", reorderRoutes_user);
 app.use("/tuser", trackorderRoutes_user);
-<<<<<<< HEAD
 app.use("/invoice",invoiceRoutes) 
 app.use("/coupon",couponRoutes)
 app.use("/deliveryPartner", deliveryPartnerModel)
 app.use("/review", reviewRoutes); 
-=======
-app.use("/invoice", invoiceRoutes);
-app.use("/coupon", couponRoutes);
-app.use("/deliveryPartner", deliveryPartnerModel);
-app.use("/review", reviewRoutes);
->>>>>>> d91528749cd110649743ae520072d0ea43554de2
 
 app.use("/auth", authRoutes);
 app.use("/fuser", favoriteRoutes_user);

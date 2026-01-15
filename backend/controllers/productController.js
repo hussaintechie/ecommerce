@@ -245,7 +245,6 @@ export const createitmfile = async (req, res) => {
   }
 };
 
-<<<<<<< HEAD
 export const orderdatas = async (req, res) => {
   try {
     const { limit = 10, offset = 0 } = req.body;
@@ -299,12 +298,10 @@ export const orderdatas = async (req, res) => {
 
 
 
-export const submitorder = async (req, res) => {
-=======
 
 
 
->>>>>>> d91528749cd110649743ae520072d0ea43554de2
+
 
 
 

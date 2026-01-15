@@ -82,22 +82,16 @@ export const adminRegister = async (req, res) => {
 const generateOTP = () =>
   Math.floor(100000 + Math.random() * 900000);
 
-const sendSMS = async (phone, otp, type = "login") => {
+const sendSMS = async (phone, otp) => {
   const mobile = phone.toString().replace(/\D/g, "");
-
-  const templates = {
-    login: "1107176665585410267",
-    delivery: "1107176587863102937",
-  };
 
   const response = await axios.post(
     "https://www.fast2sms.com/dev/bulkV2",
     {
       route: "dlt",
-      sender_id: "BLJSTR",
-      entity_id: "1101607620000090923",   // REQUIRED
-      template_id: templates[type],
-      variables_values: String(otp),     // ONLY OTP
+      sender_id: "BLJSTR",              // ✅ correct
+      message: "206816",                // ✅ DLT MESSAGE ID (from panel)
+      variables_values: otp.toString(), // matches {#var#}
       numbers: mobile,
     },
     {
@@ -108,7 +102,7 @@ const sendSMS = async (phone, otp, type = "login") => {
     }
   );
 
-  console.log("FAST2SMS RESPONSE >>>", response.data);
+  console.log("FAST2SMS RESPONSE:", response.data);
 
   if (response.data?.return !== true) {
     throw new Error(response.data?.message || "OTP failed");
@@ -116,16 +110,6 @@ const sendSMS = async (phone, otp, type = "login") => {
 
   return true;
 };
-
-
-
-
-
-
-
-
-
-
 export const login = async (req, res) => {
   try {
     const { phone, otp, sendOtp } = req.body;
@@ -177,12 +161,14 @@ export const login = async (req, res) => {
 
         finalRegisterId = store.rows[0].register_id;
 
-        await pool.query(
-          `INSERT INTO tbl_login 
-           (phone, otp, otp_expiry, user_role, register_id)
-           VALUES ($1,$2,$3,'user',$4)`,
-          [phone, newOtp, expiry, finalRegisterId]
-        );
+       const insertUser = await pool.query(
+  `INSERT INTO tbl_login 
+   (phone, otp, otp_expiry, user_role, register_id)
+   VALUES ($1,$2,$3,'user',$4)
+   RETURNING user_id`,
+  [phone, newOtp, expiry, finalRegisterId]
+);
+
       }
 
       await sendSMS(phone, newOtp);

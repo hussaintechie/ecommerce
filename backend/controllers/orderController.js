@@ -131,6 +131,18 @@ export const submitorder = async (req, res) => {
       delivery_end
     } = req.body;
 
+    if (
+  !address_delivery ||
+  address_delivery === "" ||
+  address_delivery === 0
+) {
+  return res.status(400).json({
+    status: 0,
+    message: "Please add or select a delivery address before placing order",
+  });
+}
+
+
     if (!delivery_start) {
       return res.json({ status: 0, message: "Delivery time required" });
     }

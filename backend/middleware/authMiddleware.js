@@ -1,19 +1,8 @@
 import jwt from "jsonwebtoken";
 
 export const auth = (req, res, next) => {
-<<<<<<< HEAD
   try {
-    // DEV MODE (optional)
-    if (process.env.DEV_MODE === "true") {
-      req.user = {
-        register_id: 2,
-        user_id: 9,
-        role: "user",
-      };
-      return next();
-    }
-
-    // PROD MODE
+   
     const header = req.headers.authorization;
 
     if (!header || !header.startsWith("Bearer ")) {
@@ -34,14 +23,5 @@ export const auth = (req, res, next) => {
       status: 0,
       message: "Token expired or invalid",
     });
-=======
-  if (process.env.DEV_MODE === "true") {
-    req.user = {
-      register_id: 2,
-      user_id: 9,
-      role: "user",
-    };
-    return next();
->>>>>>> d91528749cd110649743ae520072d0ea43554de2
   }
 };
