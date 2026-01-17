@@ -31,22 +31,32 @@ app.use(cors({
   origin: function (origin, callback) {
     const allowedOrigins = [
       "https://user.sribalajistores.com",
+      "https://admin.sribalajistores.com",
       "https://api.sribalajistores.com",
       "http://localhost:8081",
-      "https://admin.sribalajistores.com",
       "http://localhost:5173"
     ];
 
-    if (!origin || allowedOrigins.includes(origin)) {
-      callback(null, true);
-    } else {
-      callback(new Error("CORS not allowed"));
+    // ✅ Allow React Native / Mobile (no origin)
+    if (!origin) return callback(null, true);
+
+    // ✅ Allow Expo Web (*.exp.direct)
+    if (origin.endsWith(".exp.direct")) {
+      return callback(null, true);
     }
+
+    // ✅ Allow known domains
+    if (allowedOrigins.includes(origin)) {
+      return callback(null, true);
+    }
+
+    callback(new Error("CORS not allowed"));
   },
   credentials: true,
   methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
   allowedHeaders: ["Content-Type", "Authorization"]
 }));
+
 
 const io = new Server(server, {
   cors: {

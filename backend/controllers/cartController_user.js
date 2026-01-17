@@ -115,7 +115,7 @@ export const getCartBill = async (req, res) => {
         status: 1,
         bill: {
           item_total: 0,
-          handling_fee: 7,
+          handling_fee: 0,
           delivery_fee: 0,
           to_pay: 0,
         },
@@ -129,10 +129,10 @@ export const getCartBill = async (req, res) => {
     );
 
     // 🔥 NEW BILLING RULES
-    const HANDLING_FEE = 7;
-    const FREE_DELIVERY_LIMIT = 150;
+    const HANDLING_FEE = 0;
+    const FREE_DELIVERY_LIMIT = 0;
 
-    const delivery_fee = item_total < FREE_DELIVERY_LIMIT ? 20 : 0;
+    const delivery_fee = item_total < FREE_DELIVERY_LIMIT ? 0 : 0;
 
     const to_pay = item_total + HANDLING_FEE + delivery_fee;
 

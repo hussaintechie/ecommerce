@@ -5,7 +5,11 @@ import {
   getDriverById,
   updateDriver,
   deleteDriver,
-  getDeliveryOrderDetails
+  getDeliveryOrderDetails,
+  deliveryPartnerLogin,
+  getLoggedInDriver,
+  sendDeliveryOTP,
+  verifyDeliveryOTP
 } from "../controllers/deliveryPartnerController.js";
 
 import { singleorddetail } from "../controllers/orderController.js";
@@ -13,18 +17,29 @@ import { auth } from "../middleware/authMiddleware.js";
 
 const router = express.Router();
 
+router.post("/login", deliveryPartnerLogin);
 router.use(auth);
 
-// ✅ ORDER ROUTE MUST COME FIRST
+// 🔹 ORDER / ACTION ROUTES FIRST
 router.post("/order", singleorddetail);
+router.get("/order/:orderId", getDeliveryOrderDetails);
+router.post(
+  "/send-delivery-otp",sendDeliveryOTP
+);
+router.post(
+  "/verify-delivery-otp",verifyDeliveryOTP
+);
 
+router.get("/me", getLoggedInDriver);
 
-// Driver routes
+// 🔹 DRIVER CRUD ROUTES LAST
 router.post("/create", createDriver);
 router.get("/", getDrivers);
-router.get("/:id", getDriverById);
 router.put("/:id", updateDriver);
 router.delete("/:id", deleteDriver);
-router.get("/order/:orderId",getDeliveryOrderDetails);
+router.get("/:id", getDriverById);   // ✅ ALWAYS LAST
 
 export default router;
+
+
+
