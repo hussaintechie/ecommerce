@@ -1313,4 +1313,39 @@ export const getDeliveryOrderDetails = async (req, res) => {
     return res.status(500).json({ status: 0, message: "Server error" });
   }
 };
+export const Superdealdata = async (req, res) => {
+  try {
+    const register_id = req.user.register_id;
+
+    // 1. Get tenant DB
+    const tenantQuery = `
+      SELECT db_name 
+      FROM tbl_tenant_databases 
+      WHERE register_id = $1
+    `;
+    const result = await pool.query(tenantQuery, [register_id]);
+
+    if (result.rows.length === 0) {
+      return res.status(400).json({
+        status: 0,
+        message: "Store not found"
+      });
+    }
+
+    const tenantDB = getTenantPool(result.rows[0].db_name);
+
+    // 2. Call model
+    const response = await productmodel.Superdealdata(tenantDB);
+
+    return res.status(200).json(response);
+
+  } catch (err) {
+    console.error("Superdealdata error:", err);
+    return res.status(500).json({
+      status: 0,
+      message: "Server error",
+      error: err.message
+    });
+  }
+};
 
