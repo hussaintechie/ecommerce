@@ -1653,12 +1653,55 @@ const getChartdetails = async (tenantDB, chartmode) => {
     };
   }
 };
+const Superdealdata = async (tenantDB) => {
+  try {
+
+    const itemsQuery = `
+      SELECT 
+        product_id AS id,
+        title AS name,
+        price
+      FROM tbl_master_product
+    `;
+
+    const dealsQuery = `
+      SELECT 
+        pro.product_id AS id,
+        title AS name,
+        price AS original,
+        COALESCE(discount_per, 0) AS discount,
+        ROUND(
+          price - (price * COALESCE(discount_per, 0) / 100),
+          2
+        ) AS offer
+      FROM tbl_master_product pro
+      WHERE pro.discount_sts = 1
+        AND pro.discount_per > 0
+    `;
+
+    const itemsRes = await tenantDB.query(itemsQuery);
+    const dealsRes = await tenantDB.query(dealsQuery);
+
+    return {
+      status: 1,
+      message: "Superdealdata data fetched",
+      data: {
+        items: itemsRes.rows,   // ✅ FIX
+        deals: dealsRes.rows    // ✅ FIX
+      }
+    };
+
+  } catch (error) {
+    console.error("Superdealdata fetch error:", error);
+    return {
+      status: 0,
+      message: "Superdealdata fetch failed",
+      error: error.message
+    };
+  }
+};
 
 // productmodel.js
-
-
-
-
 
 // EXPORT DEFAULT
 export default {
@@ -1682,4 +1725,5 @@ export default {
   Lowstockdetails,
   getDashboardDatas,
   getChartdetails,
+  Superdealdata,
 };

@@ -4,7 +4,7 @@ import {
     addCategoryProduct, neweditcategory, createitmfile,   allcatedetails, catitems, 
     verifyDeliveryOTP, trackOrder, getsuperdeals, flashsaleprocess, getflashsale, submitpurchase
     , cancelPurchaseItem, cancelPurchase, purchaselist, getPurchaseEditData, Itemslist, unitlist, saveItem
-    , Optionitems, Lowstockdetails, getDashboardDatas, getChartdetails,
+    , Optionitems, Lowstockdetails, getDashboardDatas, getChartdetails,Superdealdata
 } from "../controllers/productController.js";
 import { auth } from "../middleware/authMiddleware.js"
 
@@ -40,5 +40,6 @@ router.post("/Optionitems", Optionitems);
 router.post("/Lowstockdetails", Lowstockdetails);
 router.post("/getDashboardDatas", getDashboardDatas);
 router.post("/getChartdetails", getChartdetails);
+router.post("/Superdealdata", Superdealdata);
 
 export default router;
