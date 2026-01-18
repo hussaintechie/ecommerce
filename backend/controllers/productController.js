@@ -1349,3 +1349,89 @@ export const Superdealdata = async (req, res) => {
   }
 };
 
+export const Superdealmanage = async (req, res) => {
+  try {
+    const register_id = req.user.register_id;
+    const { itmid, mode, disper } = req.body;
+
+    if (!itmid || !mode) {
+      return res.status(400).json({
+        status: 0,
+        message: "Item ID & Mode required"
+      });
+    }
+
+    const tenantQuery = `
+      SELECT db_name 
+      FROM tbl_tenant_databases 
+      WHERE register_id = $1
+    `;
+
+    const result = await pool.query(tenantQuery, [register_id]);
+
+    if (!result.rows.length) {
+      return res.status(400).json({
+        status: 0,
+        message: "Store not found"
+      });
+    }
+
+    const tenantDB = getTenantPool(result.rows[0].db_name);
+
+    const response = await productmodel.Superdealmanage(
+      tenantDB,
+      itmid,
+      Number(mode),
+      Number(disper)
+    );
+
+    return res.status(200).json(response);
+
+  } catch (err) {
+    console.error("Superdealmanage error:", err);
+    return res.status(500).json({
+      status: 0,
+      message: "Server error",
+      error: err.message
+    });
+  }
+};
+export const StockReport = async (req, res) => {
+  try {
+    const register_id = req.user.register_id;
+    const { reporttyp } = req.body;
+
+    const tenantQuery = `
+      SELECT db_name 
+      FROM tbl_tenant_databases 
+      WHERE register_id = $1
+    `;
+
+    const result = await pool.query(tenantQuery, [register_id]);
+
+    if (!result.rows.length) {
+      return res.status(400).json({
+        status: 0,
+        message: "Store not found"
+      });
+    }
+
+    const tenantDB = getTenantPool(result.rows[0].db_name);
+
+    const response = await productmodel.StockReport(
+      tenantDB,
+      reporttyp
+    );
+
+    return res.status(200).json(response);
+
+  } catch (err) {
+    console.error("Stock Report error:", err);
+    return res.status(500).json({
+      status: 0,
+      message: "Server error",
+      error: err.message
+    });
+  }
+};
+
