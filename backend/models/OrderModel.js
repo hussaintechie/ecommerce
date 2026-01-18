@@ -1,3 +1,8 @@
+const getISTDateTime = () => {
+  return new Date()
+    .toLocaleString("sv-SE", { timeZone: "Asia/Kolkata" })
+    .replace("T", " ");
+};
 const getuserorders = async (tenantDB, store_id, userid) => {
   try {
     const userordersql = `
@@ -50,56 +55,59 @@ const getuserorders = async (tenantDB, store_id, userid) => {
     return { status: 0, message: "Items Fetch failed", error };
   }
 };
-const singleorddetail = async (tenantDB, store_id, orderid) => {
+const singleorddetail = async (tenantDB, store_id, orderid, user) => {
   try {
+
+    const isDeliveryPartner = user?.role === "delivery_partner";
+
     /* ---------------- ITEMS ---------------- */
     const userorderitmsql = `
       SELECT 
-  itm.product_name AS itmname, 
-  itm.product_rate AS price,
-  itm.product_qty AS qty,
-  itm.product_amount AS total,
-  um.unitname AS unit
-FROM tbl_master_order_items itm
-INNER JOIN unitofmeasure_master um  
-  ON itm.product_unit = um.unitid
-WHERE itm.order_id = $1
-
+        itm.product_name AS itmname, 
+        itm.product_rate AS price,
+        itm.product_qty AS qty,
+        itm.product_amount AS total,
+        um.unitname AS unit
+      FROM tbl_master_order_items itm
+      INNER JOIN unitofmeasure_master um  
+        ON itm.product_unit = um.unitid
+      WHERE itm.order_id = $1
     `;
 
     /* ---------------- ORDER DETAILS ---------------- */
     const orderothrsql = `
-     SELECT
-  ord.total_amount,
-  ord.handling_fee,
-  ord.delivery_fee,
-  ord.coupon_discount AS discount_amount,
-  ord.coupon_code,
-  ord.order_no,
-  t.name AS customer_name,
-  t.phone AS customer_phone,
-  ord.address_delivery AS address,
-  COALESCE(pay.method, 'COD') AS pay_method,
-  TO_CHAR(ord.created_at, 'DD-Mon-YYYY') AS pay_date,
-  SUM(itm.product_amount) AS item_total
-FROM tbl_master_orders ord
-INNER JOIN tbl_master_order_items itm 
-  ON itm.order_id = ord.order_id
-LEFT JOIN tbl_master_payment pay 
-  ON pay.order_id = ord.order_id
-INNER JOIN tbl_address t 
-  ON t.address_id = (
-    SELECT address_id
-    FROM tbl_address
-    WHERE user_id = ord.user_id
-    ORDER BY address_id DESC
-    LIMIT 1
-  )
-WHERE ord.order_id = $1
-GROUP BY 
-  ord.order_id, t.name, t.phone, pay.method;
-
-
+      SELECT
+        ord.order_id,
+        ord.order_status,
+        ord.total_amount,
+        ord.handling_fee,
+        ord.delivery_fee,
+        ord.coupon_discount AS discount_amount,
+        ord.coupon_code,
+        ord.order_no,
+        t.name AS customer_name,
+        t.phone AS customer_phone,
+        ord.address_delivery AS address,
+        COALESCE(pay.method, 'COD') AS pay_method,
+        TO_CHAR(ord.created_at, 'DD-Mon-YYYY') AS pay_date,
+        SUM(itm.product_amount) AS item_total
+      FROM tbl_master_orders ord
+      INNER JOIN tbl_master_order_items itm 
+        ON itm.order_id = ord.order_id
+      LEFT JOIN tbl_master_payment pay 
+        ON pay.order_id = ord.order_id
+      INNER JOIN tbl_address t 
+        ON t.address_id = (
+          SELECT address_id
+          FROM tbl_address
+          WHERE user_id = ord.user_id
+          ORDER BY address_id DESC
+          LIMIT 1
+        )
+      WHERE ord.order_id = $1
+      ${isDeliveryPartner ? "AND ord.order_status = 'out_for_delivery'" : ""}
+      GROUP BY 
+        ord.order_id, t.name, t.phone, pay.method
     `;
 
     const [itmresult, otherresult] = await Promise.all([
@@ -107,47 +115,49 @@ GROUP BY
       tenantDB.query(orderothrsql, [orderid]),
     ]);
 
-    if (otherresult.rows.length === 0) {
-      return { status: 0, message: "Order not found" };
+    if (!otherresult.rows.length) {
+      return {
+        status: 0,
+        message: isDeliveryPartner
+          ? "Order not available for delivery"
+          : "Order not found",
+      };
     }
 
     const info = otherresult.rows[0];
 
-    const data = {
-      order_no: info.order_no,
-      itmdetails: itmresult.rows,
-      address: info.address,
-      customer: {
-        name: info.customer_name,
-        phone: info.customer_phone,
-      },
-      billdetails: {
-        item_total: Number(info.item_total || 0),
-        handling_fee: Number(info.handling_fee || 0),
-        delivery_fee: Number(info.delivery_fee || 0),
-        discount: Number(info.discount_amount || 0),
-        total_amount: Number(info.total_amount || 0),
-        coupon_code: info.coupon_code || null,
-      },
-
-      paydetails: {
-        pay_mode: info.pay_method,
-        pay_date: info.pay_date,
-      },
-    };
-
-    console.log("✅ SINGLE ORDER RESPONSE:", data);
-
     return {
       status: 1,
       message: "Order details fetched successfully",
-      data,
+      data: {
+        order_id: orderid,
+        order_no: info.order_no,
+        itmdetails: itmresult.rows,
+        address: info.address,
+        customer: {
+          name: info.customer_name,
+          phone: info.customer_phone,
+        },
+        billdetails: {
+          item_total: Number(info.item_total || 0),
+          handling_fee: Number(info.handling_fee || 0),
+          delivery_fee: Number(info.delivery_fee || 0),
+          discount: Number(info.discount_amount || 0),
+          total_amount: Number(info.total_amount || 0),
+          coupon_code: info.coupon_code || null,
+        },
+        paydetails: {
+          pay_mode: info.pay_method,
+          pay_date: info.pay_date,
+        },
+      },
     };
   } catch (error) {
     console.error("Order fetch error:", error);
-    return { status: 0, message: "Order Fetch failed", error };
+    return { status: 0, message: "Order Fetch failed" };
   }
 };
+
 const ordersubmit = async (
   tenantDB,
   user_id,
@@ -206,9 +216,9 @@ const ordersubmit = async (
   VALUES (
     $1, $2, $3, $4, $5,
     $6,
-    $7::timestamp,
-    $8::timestamp,
-    $9, $10, $11
+    $7,
+    $8,
+$9, $10, $11
   )
   RETURNING order_id
   `,
@@ -306,7 +316,7 @@ const ordersubmit = async (
       );
     }
     // PAYMENT STATUS FOR DB
-    const paymentDbStatus = payment_method === "COD" ? "PENDING" : "SUCCESS";
+    const paymentDbStatus = payment_method === "COD" ? "PENDING" : "complete";
 
     // INSERT PAYMENT
     await tenantDB.query(
@@ -363,9 +373,16 @@ const orderdataget = async (tenantDB, store_id, limit, offset, searchtxt) => {
   r.order_status,
   r.payment_status,
   d.delivery_mode,
-  r.delivery_start,
-  r.delivery_end,
   t.name,
+ TO_CHAR(
+  r.delivery_start,
+  'YYYY-MM-DD HH24:MI:SS'
+) AS delivery_start,
+TO_CHAR(
+  r.delivery_end,
+  'YYYY-MM-DD HH24:MI:SS'
+) AS delivery_end,
+
 
   -- ✅ ITEM COUNT
  COALESCE(SUM(i.product_qty), 0) AS item_count

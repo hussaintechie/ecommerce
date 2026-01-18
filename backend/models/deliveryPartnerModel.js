@@ -1,46 +1,55 @@
-// models/deliveryPartnerModel.js
+
 
 const deliveryPartnerModel = {
 
   // ============================
   // CREATE DRIVER
   // ============================
-  createDriver: async (tenantDB, data) => {
-    try {
-      const check = await tenantDB.query(
-        `SELECT * FROM tbl_delivery_partner WHERE mobile = $1`,
-        [data.mobile]
-      );
+  createDriver: async (tenantDB, data, register_id) => {
+  try {
+    const check = await tenantDB.query(
+      `SELECT * FROM tbl_delivery_partner WHERE mobile = $1`,
+      [data.mobile]
+    );
 
-      if (check.rowCount > 0) {
-        return { status: 0, message: "Driver already exists" };
-      }
-
-      const result = await tenantDB.query(
-        `
-        INSERT INTO tbl_delivery_partner
-        (full_name, mobile, aadhar_no, address, status)
-        VALUES ($1, $2, $3, $4, 1)
-        RETURNING driver_id
-        `,
-        [
-          data.full_name,
-          data.mobile,
-          data.aadhar_no,
-          data.address,
-        ]
-      );
-
-      return {
-        status: 1,
-        message: "Driver registered successfully",
-        driver_id: result.rows[0].driver_id,
-      };
-    } catch (error) {
-      console.error("Create driver error:", error);
-      return { status: 0, message: "Driver creation failed" };
+    if (check.rowCount > 0) {
+      return { status: 0, message: "Driver already exists" };
     }
-  },
+
+    const result = await tenantDB.query(
+      `
+      INSERT INTO tbl_delivery_partner
+      (
+        full_name,
+        mobile,
+        aadhar_no,
+        address,
+        status,
+        register_id
+      )
+      VALUES ($1, $2, $3, $4, 1, $5)
+      RETURNING driver_id
+      `,
+      [
+        data.full_name,
+        data.mobile,
+        data.aadhar_no,
+        data.address,
+        register_id, // ✅ IMPORTANT
+      ]
+    );
+
+    return {
+      status: 1,
+      message: "Driver registered successfully",
+      driver_id: result.rows[0].driver_id,
+    };
+  } catch (error) {
+    console.error("Create driver error:", error);
+    return { status: 0, message: "Driver creation failed" };
+  }
+},
+
 
   // ============================
   // GET ALL DRIVERS
@@ -138,7 +147,35 @@ const deliveryPartnerModel = {
   },
   
 
-  
+  deliveryPartnerLogin: async (tenantDB, mobile) => {
+  try {
+    const res = await tenantDB.query(
+      `
+      SELECT 
+        driver_id,
+        full_name,
+        mobile,
+        register_id
+      FROM tbl_delivery_partner
+      WHERE mobile = $1 AND status = 1
+      `,
+      [mobile]
+    );
+
+    if (res.rowCount === 0) {
+      return { status: 0, message: "Driver not found" };
+    }
+
+    return {
+      status: 1,
+      data: res.rows[0],
+    };
+  } catch (err) {
+    console.error("Driver login error:", err);
+    return { status: 0, message: "Login failed" };
+  }
+},
+
 
 
   
