@@ -89,8 +89,7 @@ const singleorddetail = async (tenantDB, store_id, orderid, user) => {
         t.phone AS customer_phone,
         ord.address_delivery AS address,
         COALESCE(pay.method, 'COD') AS pay_method,
-        TO_CHAR(ord.created_at, 'DD-Mon-YYYY') AS pay_date,
-        SUM(itm.product_amount) AS item_total
+      SUM(itm.product_amount) AS item_total
       FROM tbl_master_orders ord
       INNER JOIN tbl_master_order_items itm 
         ON itm.order_id = ord.order_id
@@ -394,8 +393,18 @@ FROM tbl_master_orders r
 INNER JOIN tbl_delivery_modes d 
   ON r.delivery_id = d.delivery_id
 
-LEFT JOIN tbl_address t 
-  ON t.user_id = r.user_id   -- ✅ FIXED
+LEFT JOIN (
+  SELECT DISTINCT ON (user_id)
+    user_id,
+    name,
+    city,
+    street,
+    landmark,
+    pincode
+  FROM tbl_address
+  ORDER BY user_id, address_id DESC
+) t ON t.user_id = r.user_id
+   -- ✅ FIXED
 
 LEFT JOIN tbl_master_order_items i 
   ON i.order_id = r.order_id
@@ -450,8 +459,14 @@ const getCustomerOrders = async (tenantDB, limit, offset) => {
     FROM tbl_master_orders o
     LEFT JOIN tbl_master_order_items i 
       ON o.order_id = i.order_id
-    LEFT JOIN tbl_address a
-      ON o.user_id = a.user_id
+   LEFT JOIN (
+      SELECT DISTINCT ON (user_id)
+        user_id,
+        name
+      FROM tbl_address
+      ORDER BY user_id, address_id DESC
+    ) a ON a.user_id = o.user_id
+
     LEFT JOIN tbl_customer_review r
       ON o.user_id = r.user_id
     GROUP BY 

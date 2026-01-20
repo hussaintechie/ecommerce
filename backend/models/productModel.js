@@ -377,6 +377,7 @@ const Itemslist = async (tenantDB, store_id, page, limit, search) => {
         itm.openbaldate,
         itm.discount_per,
         itm.discount_sts,
+        itm.itm_spctyp as itmtype,
         prdimg.image_url AS image
       FROM tbl_master_product itm
       LEFT JOIN tbl_product_images prdimg 
@@ -560,7 +561,7 @@ inner join unitofmeasure_master as unit on pro.unit = unit.unitid`;
   LIMIT 500
 )
 ORDER BY pro.product_id
-LIMIT 50;`;
+LIMIT 12;`;
 
     const orderBy = `
 ORDER BY pro.product_id
@@ -1193,6 +1194,7 @@ const saveItem = async (tenantDB, storeid, product) => {
     const itemStatus = product.itmsts ?? 1;
     const dissts = product.discount_sts ?? 0;
     const disper = Number(product.discount_per ?? 0);
+    const itmtype = product.itmtype ?? '';
 
     /* ---------- BEGIN TRANSACTION ---------- */
     await tenantDB.query("BEGIN");
@@ -1227,9 +1229,10 @@ const saveItem = async (tenantDB, storeid, product) => {
           openbaldate,
           discount_sts,
           discount_per,
+          itm_spctyp,
           created_at
         ) VALUES (
-          $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,now()
+          $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,now()
         )
         RETURNING product_id
       `;
@@ -1247,7 +1250,8 @@ const saveItem = async (tenantDB, storeid, product) => {
         openBalQty,
         openBalDate,
         dissts,
-        disper
+        disper,
+        itmtype
       ];
 
       const result = await tenantDB.query(insertSql, insertValues);
@@ -1285,8 +1289,9 @@ const saveItem = async (tenantDB, storeid, product) => {
         openbalqty = $9,
         openbaldate = $10,
         discount_sts = $11,
-        discount_per = $12
-      WHERE product_id = $13
+        discount_per = $12,
+        itm_spctyp = $13
+      WHERE product_id = $14
     `;
 
     const updateValues = [
@@ -1302,6 +1307,7 @@ const saveItem = async (tenantDB, storeid, product) => {
       openBalDate,
       dissts,
       disper,
+      itmtype,
       product.id
     ];
 
