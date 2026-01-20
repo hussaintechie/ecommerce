@@ -1855,4 +1855,5 @@ export default {
   getChartdetails,
   Superdealdata,
   Superdealmanage,
+  StockReport,
 };
