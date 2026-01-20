@@ -858,7 +858,7 @@ const updatepurchase = async (
       (purchase_id, purchase_date, instoreid, outstoreid,
        itmid, itmname, unitid, stockqty, rate, value)
       VALUES
-      ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
+      ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
     `;
 
     for (const item of purchase_items) {
@@ -1083,7 +1083,8 @@ export const getPurchaseList = async (
           ELSE 'Active'
         END AS status,
         sum(st."value") as totamt
-      FROM purchase_header  ph inner join stock_transaction as st on ph.purchaseid = st.purchase_id
+      FROM purchase_header  ph left join stock_transaction as st on ph.purchaseid = st.purchase_id
+      AND COALESCE(st.itmcandel,0)=0 AND COALESCE(st.canordersts,0)=0
       ${whereClause}
       group by ph.purchaseid
       ORDER BY purchaseid DESC
