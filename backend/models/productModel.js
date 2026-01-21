@@ -236,6 +236,7 @@ const Lowstockdetails = async (
       LEFT JOIN (
         SELECT
           itmid,
+           purchase_date,
           SUM(
             CASE
               WHEN instoreid > 0 THEN stockqty
@@ -246,8 +247,8 @@ const Lowstockdetails = async (
         FROM stock_transaction
         WHERE COALESCE(itmcandel, 0) = 0
           AND COALESCE(canordersts, 0) = 0
-        GROUP BY itmid
-      ) st ON st.itmid = p.product_id
+        GROUP BY itmid,purchase_date
+      ) st ON st.itmid = p.product_id and COALESCE(openbaldate,'2020-01-01')<=st.purchase_date
       LEFT JOIN (
         SELECT DISTINCT ON (product_id)
           product_id,
@@ -268,6 +269,7 @@ const Lowstockdetails = async (
       LEFT JOIN (
         SELECT
           itmid,
+          purchase_date,
           SUM(
             CASE
               WHEN instoreid > 0 THEN stockqty
@@ -278,8 +280,8 @@ const Lowstockdetails = async (
         FROM stock_transaction
         WHERE COALESCE(itmcandel, 0) = 0
           AND COALESCE(canordersts, 0) = 0
-        GROUP BY itmid
-      ) st ON st.itmid = p.product_id
+        GROUP BY itmid,purchase_date
+      ) st ON st.itmid = p.product_id and COALESCE(openbaldate,'2020-01-01')<=st.purchase_date
       WHERE p.itmsts = 1
         ${whereSearchCount}
         ${whereStockFilter}
@@ -328,10 +330,30 @@ const catitems = async (tenantDB, store_id, cate_id) => {
   itm.price,
   itm.mrp,
   itm.description,
+  COALESCE(
+    itm.openbalqty + COALESCE(st.current_stock, 0),
+    itm.openbalqty
+    ) AS current_stock,
   prdimg.image_url AS image
 FROM tbl_master_product itm
 LEFT JOIN tbl_product_images prdimg
   ON itm.product_id = prdimg.product_id
+  LEFT JOIN (
+        SELECT
+          itmid,
+		 purchase_date,
+          SUM(
+            CASE
+              WHEN instoreid > 0 THEN stockqty
+              WHEN outstoreid > 0 THEN -stockqty
+              ELSE 0
+            END
+          ) AS current_stock
+        FROM stock_transaction
+        WHERE COALESCE(itmcandel, 0) = 0
+          AND COALESCE(canordersts, 0) = 0
+        GROUP BY itmid,purchase_date
+      ) st ON st.itmid = itm.product_id  and COALESCE(openbaldate,'2020-01-01')<=st.purchase_date
 WHERE itm.categories_id = ${cate_id}
 ORDER BY itm.product_id`;
 
@@ -540,10 +562,30 @@ CASE
 END AS price,
 price AS "oldPrice",
 img.image_url as img,
-unit.unitname as "weight"
+unit.unitname as "weight",
+COALESCE(
+    pro.openbalqty + COALESCE(st.current_stock, 0),
+    pro.openbalqty
+    ) AS current_stock
 from tbl_master_product as pro left join tbl_product_images as img 
 on pro.product_id = img.product_id
-inner join unitofmeasure_master as unit on pro.unit = unit.unitid`;
+inner join unitofmeasure_master as unit on pro.unit = unit.unitid
+LEFT JOIN (
+        SELECT
+          itmid,
+		 purchase_date,
+          SUM(
+            CASE
+              WHEN instoreid > 0 THEN stockqty
+              WHEN outstoreid > 0 THEN -stockqty
+              ELSE 0
+            END
+          ) AS current_stock
+        FROM stock_transaction
+        WHERE COALESCE(itmcandel, 0) = 0
+          AND COALESCE(canordersts, 0) = 0
+        GROUP BY itmid,purchase_date
+      ) st ON st.itmid = pro.product_id  and COALESCE(openbaldate,'2020-01-01')<=st.purchase_date`;
 
     let dealitmsql = ` where discount_per > 0  and discount_sts =1`;
 
@@ -1466,6 +1508,7 @@ const getDashboardDatas = async (tenantDB, chartmode, date) => {
       LEFT JOIN (
         SELECT
           itmid,
+           purchase_date,
           SUM(
             CASE
               WHEN instoreid > 0 THEN stockqty
@@ -1476,8 +1519,8 @@ const getDashboardDatas = async (tenantDB, chartmode, date) => {
         FROM stock_transaction
         WHERE COALESCE(itmcandel, 0) = 0
           AND COALESCE(canordersts, 0) = 0
-        GROUP BY itmid
-      ) st ON st.itmid = p.product_id
+        GROUP BY itmid ,purchase_date
+      ) st ON st.itmid = p.product_id and COALESCE(openbaldate,'2020-01-01')<=st.purchase_date
       LEFT JOIN (
         SELECT DISTINCT ON (product_id)
           product_id,
