@@ -248,7 +248,7 @@ const Lowstockdetails = async (
         WHERE COALESCE(itmcandel, 0) = 0
           AND COALESCE(canordersts, 0) = 0
         GROUP BY itmid,purchase_date
-      ) st ON st.itmid = p.product_id and COALESCE(openbaldate,'2020-01-01')<=st.purchase_date
+      ) st ON st.itmid = p.product_id and COALESCE(p.openbaldate,'2020-01-01')<=st.purchase_date
       LEFT JOIN (
         SELECT DISTINCT ON (product_id)
           product_id,
@@ -304,7 +304,7 @@ const Lowstockdetails = async (
       message: "Stock items fetched successfully",
       data: dataRes.rows,
       total: countRes.rows[0]?.count || 0,
-      sql:dataSql,
+      sql: dataSql,
     };
 
   } catch (error) {
@@ -465,9 +465,9 @@ const getuserorders = async (tenantDB, store_id, userid) => {
     };
 
     for (const item of result.rows) {
-      if (item.order_status === "Process" || item.order_status === "Pending") { 
+      if (item.order_status === "Process" || item.order_status === "Pending") {
         data.processed.push(item);
-      } else if (item.order_status === "delivered") { 
+      } else if (item.order_status === "delivered") {
         data.delivered.push(item);
       } else if (item.order_status === "cancelled") {
         data.cancelled.push(item);
@@ -491,7 +491,7 @@ export const singleorddetail = async (req, res) => {
   // }
   try {
     const { orderid } = req.body;
-    
+
     const register_id = req.user.register_id;
     if (!register_id) {
       return res.status(400).json({
@@ -1565,7 +1565,7 @@ const getDashboardDatas = async (tenantDB, chartmode, date) => {
     console.error("DashboardDatas fetch error:", error);
     return {
       status: 0,
-      message:err.message,
+      message: err.message,
       error
     };
   }
@@ -1819,23 +1819,23 @@ inward_stock AS (
     FROM stock_transaction st
     INNER JOIN products p
         ON p.product_id = st.itmid
-       AND st.purchase_date >= p.openbaldate
+       AND st.purchase_date >= COALESCE(p.openbaldate,'2020-01-01')
     WHERE st.itmcandel = 0
+	and COALESCE(st.instoreid,0) > 0
     GROUP BY st.itmid
 ),
 
 outward_stock AS (
     SELECT
-        orditm.product_id,
-        SUM(orditm.product_qty) AS out_qty
-    FROM tbl_master_orders ord
-    INNER JOIN tbl_master_order_items orditm
-        ON ord.order_id = orditm.order_id
+        st.itmid AS product_id,
+        SUM(st.stockqty) AS out_qty
+    FROM stock_transaction st
     INNER JOIN products p
-        ON p.product_id = orditm.product_id
-       AND ord.created_at >= p.openbaldate
-    WHERE ord.order_status != 'cancelled'
-    GROUP BY orditm.product_id
+        ON p.product_id = st.itmid
+       AND st.purchase_date >= COALESCE(p.openbaldate,'2020-01-01')
+    WHERE st.itmcandel = 0
+	and COALESCE(st.outstoreid,0) > 0
+    GROUP BY st.itmid
 )
 
 SELECT * FROM (
