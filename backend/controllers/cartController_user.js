@@ -33,7 +33,7 @@ export const addToCart = async (req, res) => {
 export const getCart = async (req, res) => {
   try {
     const user_id = req.user.user_id;
-    const store_id = req.user.register_id;
+    const store_id = req.user?.register_id || req.body.register_id;
 
     const tenantDB = await CartModel.getTenantDB(store_id);
 
@@ -102,7 +102,7 @@ export const clearCart = async (req, res) => {
 export const getCartBill = async (req, res) => {
   try {
     const user_id = req.user.user_id;
-    const store_id = req.user.register_id;
+    const store_id = req.user?.register_id || req.body.store_id;
 
     const tenantDB = await CartModel.getTenantDB(store_id);
 

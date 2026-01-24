@@ -155,7 +155,7 @@ export const deleteAddress = async (req, res) => {
 
 export const listAddresses = async (req, res) => {
   try {
-    const store_id = req.user.register_id;
+    const store_id = req.user?.register_id || req.body.register_id;
     const user_id = req.user.user_id;
 
     const tenantPool = await AddressModel.getTenantDB(store_id);

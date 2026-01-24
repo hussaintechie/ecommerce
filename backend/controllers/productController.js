@@ -318,7 +318,7 @@ export const allcatedetails = async (req, res) => {
 
   try {
     const { mode_fetchorall, cate_id} = req.body;
-    const register_id=req.user.register_id
+    const register_id=req.user?.register_id || req.body.register_id;
 
     if (!register_id) {
       return res.status(400).json({
@@ -366,7 +366,7 @@ export const catitems = async (req, res) => {
 
   try {
     const {cate_id} = req.body;
-    const register_id=req.user.register_id
+    const register_id=req.user?.register_id || req.body.register_id;
 
     if (!register_id) {
       return res.status(400).json({
@@ -601,7 +601,8 @@ export const getsuperdeals = async (req, res) => {
 
   try {
    // const { mode_fetchorall, cate_id} = req.body;
-    const register_id=req.user.register_id
+   const register_id = req.user?.register_id || req.body.register_id;
+
 
     if (!register_id) {
       return res.status(400).json({

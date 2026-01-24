@@ -22,11 +22,15 @@ router.post("/trackOrder", trackOrder);
 //router.post("/markOutForDelivery", markOutForDelivery);
 router.post("/verifyDeliveryOTP", verifyDeliveryOTP)
 
+
+// router.post("/trackOrder", trackOrder);
+// //router.post("/markOutForDelivery", markOutForDelivery);
+// router.post("/verifyDeliveryOTP", verifyDeliveryOTP)
+
 const storage = multer.memoryStorage();
 const upload = multer({ storage });
 
 router.post("/createitmfile", upload.single("file"), createitmfile);
-
 
 router.post("/flashsaleprocess", flashsaleprocess);
 router.post("/getflashsale", getflashsale);
@@ -37,7 +41,7 @@ router.post("/purchaselist", purchaselist);
 router.post("/getPurchaseEditData", getPurchaseEditData);
 router.post("/Itemslist", Itemslist);
 router.post("/unitlist", unitlist);
-router.post("/saveItem", saveItem);
+router.post("/saveItem", upload.single("image"), saveItem);
 router.post("/Optionitems", Optionitems);
 router.post("/Lowstockdetails", Lowstockdetails);
 router.post("/getDashboardDatas", getDashboardDatas);
