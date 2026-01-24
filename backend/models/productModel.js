@@ -1884,7 +1884,7 @@ const Searchdata = async (tenantDB, searchtxt) => {
       (
         SELECT 
           product_id AS id,
-          title || '-(Item)' AS name,
+          title || '--(Item)' AS name,
           'search' AS url,
           'item' AS nav
         FROM tbl_master_product
@@ -1895,7 +1895,7 @@ const Searchdata = async (tenantDB, searchtxt) => {
       (
         SELECT 
           categories_id AS id,
-          categories_name || '-(Category)' AS name,
+          categories_name || '--(Category)' AS name,
           'category' AS url,
           'category' AS nav
         FROM tbl_master_categories
@@ -1917,6 +1917,65 @@ const Searchdata = async (tenantDB, searchtxt) => {
     return {
       status: 0,
       message: "Search fetch failed",
+      error: error.message
+    };
+  }
+};
+
+const SearchItems = async (tenantDB, search) => {
+  try {
+
+    const whereClause = search
+      ? `WHERE LOWER(itm.title) LIKE LOWER($1)`
+      : "";
+
+    const values = search ? [`%${search}%`] : [];
+
+    const dataSql = `
+      SELECT DISTINCT ON (itm.product_id)
+        itm.product_id AS id,
+        itm.title AS name,
+        cat.categories_name AS category,
+        itm.categories_id,
+        itm.price,
+        itm.mrp,
+        COALESCE(prdimg.image_url, '') AS image
+      FROM tbl_master_product itm
+      INNER JOIN tbl_master_categories cat 
+        ON itm.categories_id = cat.categories_id
+      LEFT JOIN tbl_product_images prdimg 
+        ON itm.product_id = prdimg.product_id
+      ${whereClause}
+      ORDER BY itm.product_id`;
+
+    // 🔹 Fetch products
+    const items = await tenantDB.query(dataSql, values);
+
+    // 🔹 Fetch categories (POPULAR_TAGS style)
+    const catetsql = `
+      SELECT categories_name
+      FROM tbl_master_categories
+      LIMIT 10
+    `;
+
+    const result = await tenantDB.query(catetsql);
+
+    const catnames = result.rows.map(
+      row => row.categories_name
+    );
+
+    return {
+      status: 1,
+      message: "Items fetched",
+      data: items.rows,
+      popularTags: catnames
+    };
+
+  } catch (error) {
+    console.error("Items fetch error:", error);
+    return {
+      status: 0,
+      message: "Items Fetch failed",
       error: error.message
     };
   }
@@ -1950,4 +2009,5 @@ export default {
   Superdealmanage,
   StockReport,
   Searchdata,
+  SearchItems,
 };
