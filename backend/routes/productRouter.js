@@ -5,7 +5,7 @@ import {
     verifyDeliveryOTP, trackOrder, getsuperdeals, flashsaleprocess, getflashsale, submitpurchase
     , cancelPurchaseItem, cancelPurchase, purchaselist, getPurchaseEditData, Itemslist, unitlist, saveItem
     , Optionitems, Lowstockdetails, getDashboardDatas, getChartdetails,Superdealdata,Superdealmanage,
-    StockReport, 
+    StockReport,Searchdata,
 } from "../controllers/productController.js";
 import { auth } from "../middleware/authMiddleware.js"
 
@@ -44,5 +44,6 @@ router.post("/getChartdetails", getChartdetails);
 router.post("/superdealinfo", Superdealdata);
 router.post("/Superdealmanage ", Superdealmanage );
 router.post("/StockReport ", StockReport );
+router.post("/Searchdata ", Searchdata );
 
 export default router;

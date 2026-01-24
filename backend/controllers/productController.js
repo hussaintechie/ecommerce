@@ -1434,4 +1434,42 @@ export const StockReport = async (req, res) => {
     });
   }
 };
+export const Searchdata = async (req, res) => {
+  try {
+    const register_id = req.user.register_id;
+    const { searchtxt } = req.body;
+
+    const tenantQuery = `
+      SELECT db_name 
+      FROM tbl_tenant_databases 
+      WHERE register_id = $1
+    `;
+
+    const result = await pool.query(tenantQuery, [register_id]);
+
+    if (!result.rows.length) {
+      return res.status(400).json({
+        status: 0,
+        message: "Store not found"
+      });
+    }
+
+    const tenantDB = getTenantPool(result.rows[0].db_name);
+
+    const response = await productmodel.Searchdata(
+      tenantDB,
+      searchtxt
+    );
+
+    return res.status(200).json(response);
+
+  } catch (err) {
+    console.error("Searchdata error:", err);
+    return res.status(500).json({
+      status: 0,
+      message: "Server error",
+      error: err.message
+    });
+  }
+};
 

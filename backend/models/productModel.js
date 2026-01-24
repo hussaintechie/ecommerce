@@ -1878,6 +1878,49 @@ ${wherecond};
   }
 };
 
+const Searchdata = async (tenantDB, searchtxt) => {
+  try {
+    const searchqry = `
+      (
+        SELECT 
+          product_id AS id,
+          title || '-(Item)' AS name,
+          'search' AS url,
+          'item' AS nav
+        FROM tbl_master_product
+        WHERE title ILIKE $1
+        LIMIT 30
+      )
+      UNION ALL
+      (
+        SELECT 
+          categories_id AS id,
+          categories_name || '-(Category)' AS name,
+          'category' AS url,
+          'category' AS nav
+        FROM tbl_master_categories
+        WHERE categories_name ILIKE $1
+        LIMIT 30
+      )
+    `;
+
+    const searchres = await tenantDB.query(searchqry, [`%${searchtxt}%`]);
+
+    return {
+      status: 1,
+      message: "Search data fetched",
+      data: searchres.rows,
+    };
+
+  } catch (error) {
+    console.error("Search fetch error:", error);
+    return {
+      status: 0,
+      message: "Search fetch failed",
+      error: error.message
+    };
+  }
+};
 
 // productmodel.js
 
@@ -1906,4 +1949,5 @@ export default {
   Superdealdata,
   Superdealmanage,
   StockReport,
+  Searchdata,
 };
