@@ -558,6 +558,10 @@ export const saveItem = async (req, res) => {
   try {
     const register_id = req.user.register_id;
       const { productdata } = req.body;
+            return res.status(400).json({
+        status: 0,
+        message: productdata,
+      });
     if (!register_id) {
       return res.status(400).json({ status: 0, message: "Store ID required" });
     }
