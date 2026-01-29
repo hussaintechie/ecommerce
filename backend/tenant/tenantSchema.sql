@@ -1,6 +1,6 @@
 CREATE TABLE tbl_address (
     address_id      SERIAL PRIMARY KEY,
-    user_id         INT NOT NULL,
+    user_id       UNIQUE  INT NOT NULL,
     store_id        INTEGER,
     name            VARCHAR(100),
     phone           VARCHAR(15),

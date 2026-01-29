@@ -15,8 +15,103 @@ export const AddressModel = {
   },
 
 
-  addAddress: async (tenantPool, data) => {
-    const {
+//   addAddress: async (tenantPool, data) => {
+//     const {
+//       user_id,
+//       store_id,
+//       address_type,
+//       name,
+//       phone,
+//       pincode,
+//       city,
+//       street,
+//       Building,
+//       landmark,
+//       lat,
+//       lng,
+//       is_default,
+//       full_address,
+
+//     } = data;
+
+//     const res = await tenantPool.query(
+//       `INSERT INTO tbl_address (
+//         user_id,store_id, address_type, name, phone,
+//         pincode,  city,
+//         street, Building,landmark, lat, lng, full_address,
+// is_default,
+//         created_at
+//       )
+//       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,NOW())
+//       RETURNING address_id`,
+//       [
+//         user_id,
+//         store_id,
+//         address_type,
+//         name,
+//         phone,
+//         pincode,
+//         city,
+//         street,
+//         Building,
+//         landmark,
+//         lat,
+//         lng,
+//         full_address,
+
+//         is_default,
+//       ]
+//     );
+
+//     return res.rows[0].address_id;
+//   },
+addAddress: async (tenantPool, data) => {
+  const {
+    user_id,
+    store_id,
+    address_type,
+    name,
+    phone,
+    pincode,
+    city,
+    street,
+    Building,
+    landmark,
+    lat,
+    lng,
+    is_default,
+    full_address,
+  } = data;
+
+  const res = await tenantPool.query(
+    `
+    INSERT INTO tbl_address (
+      user_id, store_id, address_type, name, phone,
+      pincode, city, street, Building, landmark,
+      lat, lng, full_address, is_default, created_at
+    )
+    VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,NOW())
+
+    ON CONFLICT (user_id)
+    DO UPDATE SET
+      store_id      = EXCLUDED.store_id,
+      address_type  = EXCLUDED.address_type,
+      name          = EXCLUDED.name,
+      phone         = EXCLUDED.phone,
+      pincode       = EXCLUDED.pincode,
+      city          = EXCLUDED.city,
+      street        = EXCLUDED.street,
+      Building      = EXCLUDED.Building,
+      landmark      = EXCLUDED.landmark,
+      lat           = EXCLUDED.lat,
+      lng           = EXCLUDED.lng,
+      full_address  = EXCLUDED.full_address,
+      is_default    = EXCLUDED.is_default,
+      updated_at    = NOW()
+
+    RETURNING address_id
+    `,
+    [
       user_id,
       store_id,
       address_type,
@@ -29,42 +124,13 @@ export const AddressModel = {
       landmark,
       lat,
       lng,
-      is_default,
       full_address,
+      is_default,
+    ]
+  );
 
-    } = data;
-
-    const res = await tenantPool.query(
-      `INSERT INTO tbl_address (
-        user_id,store_id, address_type, name, phone,
-        pincode,  city,
-        street, Building,landmark, lat, lng, full_address,
-is_default,
-        created_at
-      )
-      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,NOW())
-      RETURNING address_id`,
-      [
-        user_id,
-        store_id,
-        address_type,
-        name,
-        phone,
-        pincode,
-        city,
-        street,
-        Building,
-        landmark,
-        lat,
-        lng,
-        full_address,
-
-        is_default,
-      ]
-    );
-
-    return res.rows[0].address_id;
-  },
+  return res.rows[0].address_id;
+},
 
 
   editAddress: async (tenantPool, address_id, data) => {

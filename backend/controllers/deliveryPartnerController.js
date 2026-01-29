@@ -185,10 +185,12 @@ export const getDeliveryOrderDetails = async (req, res) => {
         o.order_no,
         a.name, 
         a.phone,
-        a.address
+        a.address,
+        o.order_status
       FROM tbl_master_orders o
       JOIN tbl_address a ON a.user_id = o.user_id
       WHERE o.order_id = $1
+      AND o.order_status = 'out_for_delivery'
     `;
 
     const result = await tenantDB.query(query, [orderId]);
