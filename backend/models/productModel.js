@@ -236,6 +236,7 @@ const Lowstockdetails = async (
       LEFT JOIN (
         SELECT
           itmid,
+           purchase_date,
           SUM(
             CASE
               WHEN instoreid > 0 THEN stockqty
@@ -246,8 +247,8 @@ const Lowstockdetails = async (
         FROM stock_transaction
         WHERE COALESCE(itmcandel, 0) = 0
           AND COALESCE(canordersts, 0) = 0
-        GROUP BY itmid
-      ) st ON st.itmid = p.product_id
+        GROUP BY itmid,purchase_date
+      ) st ON st.itmid = p.product_id and COALESCE(p.openbaldate,'2020-01-01')<=st.purchase_date
       LEFT JOIN (
         SELECT DISTINCT ON (product_id)
           product_id,
@@ -268,6 +269,7 @@ const Lowstockdetails = async (
       LEFT JOIN (
         SELECT
           itmid,
+          purchase_date,
           SUM(
             CASE
               WHEN instoreid > 0 THEN stockqty
@@ -278,8 +280,8 @@ const Lowstockdetails = async (
         FROM stock_transaction
         WHERE COALESCE(itmcandel, 0) = 0
           AND COALESCE(canordersts, 0) = 0
-        GROUP BY itmid
-      ) st ON st.itmid = p.product_id
+        GROUP BY itmid,purchase_date
+      ) st ON st.itmid = p.product_id and COALESCE(openbaldate,'2020-01-01')<=st.purchase_date
       WHERE p.itmsts = 1
         ${whereSearchCount}
         ${whereStockFilter}
@@ -302,7 +304,7 @@ const Lowstockdetails = async (
       message: "Stock items fetched successfully",
       data: dataRes.rows,
       total: countRes.rows[0]?.count || 0,
-      sql:dataSql,
+      sql: dataSql,
     };
 
   } catch (error) {
@@ -328,10 +330,30 @@ const catitems = async (tenantDB, store_id, cate_id) => {
   itm.price,
   itm.mrp,
   itm.description,
+  COALESCE(
+    itm.openbalqty + COALESCE(st.current_stock, 0),
+    itm.openbalqty
+    ) AS current_stock,
   prdimg.image_url AS image
 FROM tbl_master_product itm
 LEFT JOIN tbl_product_images prdimg
   ON itm.product_id = prdimg.product_id
+  LEFT JOIN (
+        SELECT
+          itmid,
+		 purchase_date,
+          SUM(
+            CASE
+              WHEN instoreid > 0 THEN stockqty
+              WHEN outstoreid > 0 THEN -stockqty
+              ELSE 0
+            END
+          ) AS current_stock
+        FROM stock_transaction
+        WHERE COALESCE(itmcandel, 0) = 0
+          AND COALESCE(canordersts, 0) = 0
+        GROUP BY itmid,purchase_date
+      ) st ON st.itmid = itm.product_id  and COALESCE(openbaldate,'2020-01-01')<=st.purchase_date
 WHERE itm.categories_id = ${cate_id}
 ORDER BY itm.product_id`;
 
@@ -377,6 +399,7 @@ const Itemslist = async (tenantDB, store_id, page, limit, search) => {
         itm.openbaldate,
         itm.discount_per,
         itm.discount_sts,
+        itm.itm_spctyp as itmtype,
         prdimg.image_url AS image
       FROM tbl_master_product itm
       LEFT JOIN tbl_product_images prdimg 
@@ -442,9 +465,9 @@ const getuserorders = async (tenantDB, store_id, userid) => {
     };
 
     for (const item of result.rows) {
-      if (item.order_status === "Process" || item.order_status === "Pending") { 
+      if (item.order_status === "Process" || item.order_status === "Pending") {
         data.processed.push(item);
-      } else if (item.order_status === "delivered") { 
+      } else if (item.order_status === "delivered") {
         data.delivered.push(item);
       } else if (item.order_status === "cancelled") {
         data.cancelled.push(item);
@@ -468,7 +491,7 @@ export const singleorddetail = async (req, res) => {
   // }
   try {
     const { orderid } = req.body;
-    
+
     const register_id = req.user.register_id;
     if (!register_id) {
       return res.status(400).json({
@@ -539,10 +562,30 @@ CASE
 END AS price,
 price AS "oldPrice",
 img.image_url as img,
-unit.unitname as "weight"
+unit.unitname as "weight",
+COALESCE(
+    pro.openbalqty + COALESCE(st.current_stock, 0),
+    pro.openbalqty
+    ) AS current_stock
 from tbl_master_product as pro left join tbl_product_images as img 
 on pro.product_id = img.product_id
-inner join unitofmeasure_master as unit on pro.unit = unit.unitid`;
+inner join unitofmeasure_master as unit on pro.unit = unit.unitid
+LEFT JOIN (
+        SELECT
+          itmid,
+		 purchase_date,
+          SUM(
+            CASE
+              WHEN instoreid > 0 THEN stockqty
+              WHEN outstoreid > 0 THEN -stockqty
+              ELSE 0
+            END
+          ) AS current_stock
+        FROM stock_transaction
+        WHERE COALESCE(itmcandel, 0) = 0
+          AND COALESCE(canordersts, 0) = 0
+        GROUP BY itmid,purchase_date
+      ) st ON st.itmid = pro.product_id  and COALESCE(openbaldate,'2020-01-01')<=st.purchase_date`;
 
     let dealitmsql = ` where discount_per > 0  and discount_sts =1`;
 
@@ -560,7 +603,7 @@ inner join unitofmeasure_master as unit on pro.unit = unit.unitid`;
   LIMIT 500
 )
 ORDER BY pro.product_id
-LIMIT 50;`;
+LIMIT 12;`;
 
     const orderBy = `
 ORDER BY pro.product_id
@@ -857,7 +900,7 @@ const updatepurchase = async (
       (purchase_id, purchase_date, instoreid, outstoreid,
        itmid, itmname, unitid, stockqty, rate, value)
       VALUES
-      ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
+      ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
     `;
 
     for (const item of purchase_items) {
@@ -1082,7 +1125,8 @@ export const getPurchaseList = async (
           ELSE 'Active'
         END AS status,
         sum(st."value") as totamt
-      FROM purchase_header  ph inner join stock_transaction as st on ph.purchaseid = st.purchase_id
+      FROM purchase_header  ph left join stock_transaction as st on ph.purchaseid = st.purchase_id
+      AND COALESCE(st.itmcandel,0)=0 AND COALESCE(st.canordersts,0)=0
       ${whereClause}
       group by ph.purchaseid
       ORDER BY purchaseid DESC
@@ -1193,6 +1237,7 @@ const saveItem = async (tenantDB, storeid, product) => {
     const itemStatus = product.itmsts ?? 1;
     const dissts = product.discount_sts ?? 0;
     const disper = Number(product.discount_per ?? 0);
+    const itmtype = product.itmtype ?? '';
 
     /* ---------- BEGIN TRANSACTION ---------- */
     await tenantDB.query("BEGIN");
@@ -1227,9 +1272,10 @@ const saveItem = async (tenantDB, storeid, product) => {
           openbaldate,
           discount_sts,
           discount_per,
+          itm_spctyp,
           created_at
         ) VALUES (
-          $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,now()
+          $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,now()
         )
         RETURNING product_id
       `;
@@ -1247,7 +1293,8 @@ const saveItem = async (tenantDB, storeid, product) => {
         openBalQty,
         openBalDate,
         dissts,
-        disper
+        disper,
+        itmtype
       ];
 
       const result = await tenantDB.query(insertSql, insertValues);
@@ -1285,8 +1332,9 @@ const saveItem = async (tenantDB, storeid, product) => {
         openbalqty = $9,
         openbaldate = $10,
         discount_sts = $11,
-        discount_per = $12
-      WHERE product_id = $13
+        discount_per = $12,
+        itm_spctyp = $13
+      WHERE product_id = $14
     `;
 
     const updateValues = [
@@ -1302,6 +1350,7 @@ const saveItem = async (tenantDB, storeid, product) => {
       openBalDate,
       dissts,
       disper,
+      itmtype,
       product.id
     ];
 
@@ -1459,6 +1508,7 @@ const getDashboardDatas = async (tenantDB, chartmode, date) => {
       LEFT JOIN (
         SELECT
           itmid,
+           purchase_date,
           SUM(
             CASE
               WHEN instoreid > 0 THEN stockqty
@@ -1469,8 +1519,8 @@ const getDashboardDatas = async (tenantDB, chartmode, date) => {
         FROM stock_transaction
         WHERE COALESCE(itmcandel, 0) = 0
           AND COALESCE(canordersts, 0) = 0
-        GROUP BY itmid
-      ) st ON st.itmid = p.product_id
+        GROUP BY itmid ,purchase_date
+      ) st ON st.itmid = p.product_id and COALESCE(openbaldate,'2020-01-01')<=st.purchase_date
       LEFT JOIN (
         SELECT DISTINCT ON (product_id)
           product_id,
@@ -1515,7 +1565,7 @@ const getDashboardDatas = async (tenantDB, chartmode, date) => {
     console.error("DashboardDatas fetch error:", error);
     return {
       status: 0,
-      message:err.message,
+      message: err.message,
       error
     };
   }
@@ -1653,12 +1703,285 @@ const getChartdetails = async (tenantDB, chartmode) => {
     };
   }
 };
+const Superdealdata = async (tenantDB) => {
+  try {
+
+    const itemsQuery = `
+      SELECT 
+        product_id AS id,
+        title AS name,
+        price
+      FROM tbl_master_product
+    `;
+
+    const dealsQuery = `
+      SELECT 
+        pro.product_id AS id,
+        title AS name,
+        price AS original,
+        COALESCE(discount_per, 0) AS discount,
+        ROUND(
+          price - (price * COALESCE(discount_per, 0) / 100),
+          2
+        ) AS offer
+      FROM tbl_master_product pro
+      WHERE pro.discount_sts = 1
+        AND pro.discount_per > 0
+    `;
+
+    const itemsRes = await tenantDB.query(itemsQuery);
+    const dealsRes = await tenantDB.query(dealsQuery);
+
+    return {
+      status: 1,
+      message: "Superdealdata data fetched",
+      data: {
+        items: itemsRes.rows,   // ✅ FIX
+        deals: dealsRes.rows    // ✅ FIX
+      }
+    };
+
+  } catch (error) {
+    console.error("Superdealdata fetch error:", error);
+    return {
+      status: 0,
+      message: "Superdealdata fetch failed",
+      error: error.message
+    };
+  }
+};
+const Superdealmanage = async (tenantDB, itmid, mode, disper) => {
+  try {
+    let query = '';
+    let params = [];
+
+    if (mode === 1) {
+      query = `
+        UPDATE tbl_master_product
+        SET discount_per = $1,
+            discount_sts = 1
+        WHERE product_id = $2
+      `;
+      params = [disper, itmid];
+    }
+
+    if (mode === 2) {
+      query = `
+        UPDATE tbl_master_product
+        SET discount_per = 0,
+            discount_sts = 0
+        WHERE product_id = $1
+      `;
+      params = [itmid];
+    }
+
+    await tenantDB.query(query, params);
+
+    return {
+      status: 1,
+      message: "Updated Successfully"
+    };
+
+  } catch (error) {
+    console.error("Updated error:", error);
+    return {
+      status: 0,
+      message: "Update failed",
+      error: error.message
+    };
+  }
+};
+export const StockReport = async (tenantDB, rpttyp) => {
+  try {
+
+    let wherecond = ``;
+
+    if (rpttyp == "in") {
+      wherecond = ` WHERE tt.current_stock > 0`;
+    } else if (rpttyp == "out") {
+      wherecond = ` WHERE tt.current_stock = 0`;
+    }
+
+    const itemSql = `
+WITH products AS (
+    SELECT
+        product_id,
+        title,
+        openbalqty,
+        openbaldate
+    FROM tbl_master_product
+),
+
+inward_stock AS (
+    SELECT
+        st.itmid AS product_id,
+        SUM(st.stockqty) AS in_qty
+    FROM stock_transaction st
+    INNER JOIN products p
+        ON p.product_id = st.itmid
+       AND st.purchase_date >= COALESCE(p.openbaldate,'2020-01-01')
+    WHERE st.itmcandel = 0
+	and COALESCE(st.instoreid,0) > 0
+    GROUP BY st.itmid
+),
+
+outward_stock AS (
+    SELECT
+        st.itmid AS product_id,
+        SUM(st.stockqty) AS out_qty
+    FROM stock_transaction st
+    INNER JOIN products p
+        ON p.product_id = st.itmid
+       AND st.purchase_date >= COALESCE(p.openbaldate,'2020-01-01')
+    WHERE st.itmcandel = 0
+	and COALESCE(st.outstoreid,0) > 0
+    GROUP BY st.itmid
+)
+
+SELECT * FROM (
+    SELECT
+        p.product_id,
+        p.title,
+        p.openbalqty,
+        COALESCE(i.in_qty, 0) AS in_qty,
+        COALESCE(o.out_qty, 0) AS out_qty,
+        (
+          p.openbalqty
+          + COALESCE(i.in_qty, 0)
+          - COALESCE(o.out_qty, 0)
+        ) AS current_stock
+    FROM products p
+    LEFT JOIN inward_stock i ON i.product_id = p.product_id
+    LEFT JOIN outward_stock o ON o.product_id = p.product_id
+) AS tt
+${wherecond};
+`;
+
+    const itemRes = await tenantDB.query(itemSql);
+
+    return {
+      data: itemRes.rows,
+      status: 1,
+      message: "data fetched"
+    };
+
+  } catch (error) {
+
+    console.error("StockReport error:", error);
+
+    return {
+      data: [],
+      status: 0,
+      message: "error while fetching stock report",
+      error: error.message
+    };
+  }
+};
+
+const Searchdata = async (tenantDB, searchtxt) => {
+  try {
+    const searchqry = `
+      (
+        SELECT 
+          product_id AS id,
+          title || '--(Item)' AS name,
+          'search' AS url,
+          'item' AS nav
+        FROM tbl_master_product
+        WHERE title ILIKE $1
+        LIMIT 30
+      )
+      UNION ALL
+      (
+        SELECT 
+          categories_id AS id,
+          categories_name || '--(Category)' AS name,
+          'category' AS url,
+          'category' AS nav
+        FROM tbl_master_categories
+        WHERE categories_name ILIKE $1
+        LIMIT 30
+      )
+    `;
+
+    const searchres = await tenantDB.query(searchqry, [`%${searchtxt}%`]);
+
+    return {
+      status: 1,
+      message: "Search data fetched",
+      data: searchres.rows,
+    };
+
+  } catch (error) {
+    console.error("Search fetch error:", error);
+    return {
+      status: 0,
+      message: "Search fetch failed",
+      error: error.message
+    };
+  }
+};
+
+const SearchItems = async (tenantDB, search) => {
+  try {
+
+    const whereClause = search
+      ? `WHERE LOWER(itm.title) LIKE LOWER($1)`
+      : "";
+
+    const values = search ? [`%${search}%`] : [];
+
+    const dataSql = `
+      SELECT DISTINCT ON (itm.product_id)
+        itm.product_id AS id,
+        itm.title AS name,
+        cat.categories_name AS category,
+        itm.categories_id,
+        itm.price,
+        itm.mrp,
+        COALESCE(prdimg.image_url, '') AS image
+      FROM tbl_master_product itm
+      INNER JOIN tbl_master_categories cat 
+        ON itm.categories_id = cat.categories_id
+      LEFT JOIN tbl_product_images prdimg 
+        ON itm.product_id = prdimg.product_id
+      ${whereClause}
+      ORDER BY itm.product_id`;
+
+    // 🔹 Fetch products
+    const items = await tenantDB.query(dataSql, values);
+
+    // 🔹 Fetch categories (POPULAR_TAGS style)
+    const catetsql = `
+      SELECT categories_name
+      FROM tbl_master_categories
+      LIMIT 10
+    `;
+
+    const result = await tenantDB.query(catetsql);
+
+    const catnames = result.rows.map(
+      row => row.categories_name
+    );
+
+    return {
+      status: 1,
+      message: "Items fetched",
+      data: items.rows,
+      popularTags: catnames
+    };
+
+  } catch (error) {
+    console.error("Items fetch error:", error);
+    return {
+      status: 0,
+      message: "Items Fetch failed",
+      error: error.message
+    };
+  }
+};
 
 // productmodel.js
-
-
-
-
 
 // EXPORT DEFAULT
 export default {
@@ -1682,4 +2005,9 @@ export default {
   Lowstockdetails,
   getDashboardDatas,
   getChartdetails,
+  Superdealdata,
+  Superdealmanage,
+  StockReport,
+  Searchdata,
+  SearchItems,
 };

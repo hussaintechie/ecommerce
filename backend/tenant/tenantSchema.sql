@@ -81,6 +81,8 @@ CREATE TABLE IF NOT EXISTS tbl_master_orders (
     delivery_id INT,
     payment_status VARCHAR(10) DEFAULT 'pending',
    coupon_code VARCHAR(50),
+   delivery_start TYPE timestamptz,
+   delivery_end TYPE timestamptz,
    coupon_discount NUMERIC(10,2) DEFAULT 0,
    first_order_discount NUMERIC(10,2) DEFAULT 0,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -218,8 +220,6 @@ CREATE TABLE tbl_customer_review (
   is_reviewed BOOLEAN DEFAULT TRUE,
   created_at TIMESTAMP DEFAULT NOW()
 );
-<<<<<<< HEAD
-=======
 CREATE TABLE if not exists stock_transaction (
     stocktrnid SERIAL PRIMARY KEY,
     purchase_id INTEGER NOT NULL,
@@ -237,4 +237,12 @@ CREATE TABLE if not exists stock_transaction (
     itmcandel INTEGER DEFAULT 0,
     canordersts INTEGER DEFAULT 0
 );
->>>>>>> d91528749cd110649743ae520072d0ea43554de2
+CREATE TABLE tbl_delivery_otp (
+  otp_id SERIAL PRIMARY KEY,
+  order_id INT NOT NULL,
+  phone VARCHAR(15) NOT NULL,
+  otp VARCHAR(6) NOT NULL,
+  otp_expiry TIMESTAMP NOT NULL,
+  verified BOOLEAN DEFAULT FALSE,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);

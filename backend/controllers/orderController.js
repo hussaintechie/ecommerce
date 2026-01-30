@@ -95,7 +95,7 @@ export const singleorddetail = async (req, res) => {
     const tenantDB = getTenantPool(result.rows[0].db_name);
 
     // Call model function
-    const userorderres = await OrderModel.singleorddetail(tenantDB,register_id ,orderid);
+    const userorderres = await OrderModel.singleorddetail(tenantDB,register_id ,orderid,req.user );
 
     return res.status(200).json(userorderres);
 

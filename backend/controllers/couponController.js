@@ -45,7 +45,7 @@ export const createCoupon = async (req, res) => {
 // 📋 List coupons
 export const getCoupons = async (req, res) => {
   try {
-    const tenantDB = await CouponModel.getTenantDB(req.user.register_id);
+    const tenantDB = await CouponModel.getTenantDB(req.user?.register_id || req.body.register_id);
 
     const result = await CouponModel.getCoupons(
       tenantDB,

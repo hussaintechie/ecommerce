@@ -4,6 +4,7 @@ import { getTenantPool } from "../config/tenantDB.js";
 import productmodel from "../models/productModel.js";
 import crypto from "crypto";
 
+
 // -----------------------------
 // Razorpay Signature Validation
 // -----------------------------
@@ -21,7 +22,7 @@ function isValidRazorpaySignature(orderId, paymentId, signature) {
 export const addCategoryProduct = async (req, res) => {
   try {
     const {
-     
+
       category_name,
       title,
       description,
@@ -31,7 +32,7 @@ export const addCategoryProduct = async (req, res) => {
       thumbnail,
       images
     } = req.body;
-    const register_id=req.user.register_id
+    const register_id = req.user.register_id
 
     if (
       !register_id ||
@@ -114,8 +115,8 @@ export const neweditcategory = async (req, res) => {
   //} API REQUEST PARAMETER
 
   try {
-    const {  category_name, sts, mode, catid } = req.body;
-    const register_id=req.user.register_id
+    const { category_name, sts, mode, catid } = req.body;
+    const register_id = req.user.register_id
 
     // VALIDATION
     if (!register_id || !category_name) {
@@ -175,7 +176,7 @@ export const createitmfile = async (req, res) => {
       return res.status(400).json({ status: 0, message: "File not uploaded" });
     }
 
-    const register_id=req.user.register_id
+    const register_id = req.user.register_id
 
     // Read Excel buffer
     const workbook = XLSX.read(req.file.buffer, { type: "buffer" });
@@ -310,15 +311,15 @@ export const orderdatas = async (req, res) => {
 
 export const allcatedetails = async (req, res) => {
 
-// {
-//   "register_id": 1,
-//   "mode_fetchorall": 0,
-//   "cate_id": 0
-// }
+  // {
+  //   "register_id": 1,
+  //   "mode_fetchorall": 0,
+  //   "cate_id": 0
+  // }
 
   try {
-    const { mode_fetchorall, cate_id} = req.body;
-    const register_id=req.user.register_id
+    const { mode_fetchorall, cate_id } = req.body;
+    const register_id = req.user?.register_id || req.body.register_id;
 
     if (!register_id) {
       return res.status(400).json({
@@ -344,7 +345,7 @@ export const allcatedetails = async (req, res) => {
     const tenantDB = getTenantPool(result.rows[0].db_name);
 
     // Call model function
-    const catedatares = await productmodel.allcatedetails(tenantDB,register_id,mode_fetchorall ,cate_id);
+    const catedatares = await productmodel.allcatedetails(tenantDB, register_id, mode_fetchorall, cate_id);
 
     return res.status(200).json(catedatares);
 
@@ -359,14 +360,14 @@ export const allcatedetails = async (req, res) => {
 };
 export const catitems = async (req, res) => {
 
-// {
-//   "register_id": 1,
-//   "cate_id": 0
-// }
+  // {
+  //   "register_id": 1,
+  //   "cate_id": 0
+  // }
 
   try {
-    const {cate_id} = req.body;
-    const register_id=req.user.register_id
+    const { cate_id } = req.body;
+    const register_id = req.user?.register_id || req.body.register_id;
 
     if (!register_id) {
       return res.status(400).json({
@@ -392,7 +393,7 @@ export const catitems = async (req, res) => {
     const tenantDB = getTenantPool(result.rows[0].db_name);
 
     // Call model function
-    const catedatares = await productmodel.catitems(tenantDB,register_id ,cate_id);
+    const catedatares = await productmodel.catitems(tenantDB, register_id, cate_id);
 
     return res.status(200).json(catedatares);
 
@@ -445,7 +446,7 @@ export const Itemslist = async (req, res) => {
 export const unitlist = async (req, res) => {
   try {
     const register_id = req.user.register_id;
-  
+
     if (!register_id) {
       return res.status(400).json({ status: 0, message: "Store ID required" });
     }
@@ -478,7 +479,7 @@ export const unitlist = async (req, res) => {
 export const Optionitems = async (req, res) => {
   try {
     const register_id = req.user.register_id;
-  
+
     if (!register_id) {
       return res.status(400).json({ status: 0, message: "Store ID required" });
     }
@@ -511,7 +512,7 @@ export const Optionitems = async (req, res) => {
 export const Lowstockdetails = async (req, res) => {
   try {
     const register_id = req.user?.register_id;
-    const { page = 1, limit = 10, search = "" ,filtertyp} = req.body;
+    const { page = 1, limit = 10, search = "", filtertyp } = req.body;
 
     if (!register_id) {
       return res.status(401).json({
@@ -554,10 +555,31 @@ export const Lowstockdetails = async (req, res) => {
   }
 };
 
+
+export const uploadToS3 = async (file) => {
+  const fileName = `products/${Date.now()}_${file.originalname}`;
+
+  const command = new PutObjectCommand({
+    Bucket: process.env.AWS_BUCKET_NAME,
+    Key: fileName,
+    Body: file.buffer,
+    ContentType: file.mimetype,
+    ACL: "public-read"
+  });
+
+  await s3.send(command);
+
+  return `https://${process.env.AWS_BUCKET_NAME}.s3.${process.env.AWS_REGION}.amazonaws.com/${fileName}`;
+};
+
+
 export const saveItem = async (req, res) => {
   try {
     const register_id = req.user.register_id;
-      const { productdata } = req.body;
+    const product = req.body;
+    const file = req.file;
+
+
     if (!register_id) {
       return res.status(400).json({ status: 0, message: "Store ID required" });
     }
@@ -573,12 +595,22 @@ export const saveItem = async (req, res) => {
       return res.status(400).json({ status: 0, message: "Store not found" });
     }
 
+
+    if (file) {
+      const imageUrl = await uploadToS3(file);
+      product.image = imageUrl; // ✅ VERY IMPORTANT
+    }
+
+    return res.status(400).json({
+      status: 0,
+      message: imageUrl,
+    });
     const tenantDB = getTenantPool(tenantRes.rows[0].db_name);
 
     const result = await productmodel.saveItem(
       tenantDB,
       register_id,
-      productdata
+      product
     );
 
     return res.status(200).json(result);
@@ -593,15 +625,16 @@ export const saveItem = async (req, res) => {
 
 export const getsuperdeals = async (req, res) => {
 
-// {
-//   "register_id": 1,
-//   "mode_fetchorall": 0,
-//   "cate_id": 0
-// }
+  // {
+  //   "register_id": 1,
+  //   "mode_fetchorall": 0,
+  //   "cate_id": 0
+  // }
 
   try {
-   // const { mode_fetchorall, cate_id} = req.body;
-    const register_id=req.user.register_id
+    // const { mode_fetchorall, cate_id} = req.body;
+    const register_id = req.user?.register_id || req.body.register_id;
+
 
     if (!register_id) {
       return res.status(400).json({
@@ -627,7 +660,7 @@ export const getsuperdeals = async (req, res) => {
     const tenantDB = getTenantPool(result.rows[0].db_name);
 
     // Call model function
-    const catedatares = await productmodel.getsuperdealsmodel(tenantDB,register_id);
+    const catedatares = await productmodel.getsuperdealsmodel(tenantDB, register_id);
 
     return res.status(200).json(catedatares);
 
@@ -643,25 +676,25 @@ export const getsuperdeals = async (req, res) => {
 
 export const flashsaleprocess = async (req, res) => {
 
-// {
-//   "from_datetime": ''2025-12-01 22:10:00'',
-//   "to_datetime":'2025-12-11 23:45:00'    
-//   "items_details": [
-//     {
-//       "product_id": 2,
-//       "product_rate": 46
-//     },
-//     {
-//       "product_id": 4,
-//       "product_qty": 10
-//     }
-//   ]
-// }
+  // {
+  //   "from_datetime": ''2025-12-01 22:10:00'',
+  //   "to_datetime":'2025-12-11 23:45:00'    
+  //   "items_details": [
+  //     {
+  //       "product_id": 2,
+  //       "product_rate": 46
+  //     },
+  //     {
+  //       "product_id": 4,
+  //       "product_qty": 10
+  //     }
+  //   ]
+  // }
 
   try {
-    const {from_datetime ,to_datetime ,items_details } = req.body;
-    const register_id=req.user.register_id
-    const user_id=req.user.user_id
+    const { from_datetime, to_datetime, items_details } = req.body;
+    const register_id = req.user.register_id
+    const user_id = req.user.user_id
 
     if (!register_id) {
       return res.status(400).json({
@@ -692,7 +725,7 @@ export const flashsaleprocess = async (req, res) => {
     const tenantDB = getTenantPool(result.rows[0].db_name);
 
     // Call model function
-    const orderdatares = await productmodel.flashsalemodel(tenantDB,register_id,user_id ,from_datetime ,to_datetime ,items_details);
+    const orderdatares = await productmodel.flashsalemodel(tenantDB, register_id, user_id, from_datetime, to_datetime, items_details);
 
     return res.status(200).json(orderdatares);
 
@@ -708,8 +741,8 @@ export const flashsaleprocess = async (req, res) => {
 export const getflashsale = async (req, res) => {
   try {
 
-    const register_id=req.user.register_id
-    const user_id=req.user.user_id
+    const register_id = req.user.register_id
+    const user_id = req.user.user_id
 
     if (!register_id) {
       return res.status(400).json({
@@ -735,7 +768,7 @@ export const getflashsale = async (req, res) => {
     const tenantDB = getTenantPool(result.rows[0].db_name);
 
     // Call model function
-    const orderdatares = await productmodel.getflashsale(tenantDB,register_id,user_id);
+    const orderdatares = await productmodel.getflashsale(tenantDB, register_id, user_id);
 
     return res.status(200).json(orderdatares);
 
@@ -750,48 +783,48 @@ export const getflashsale = async (req, res) => {
 };
 export const submitpurchase = async (req, res) => {
 
-        // {
-        // "purchase_mode":"1",
-        // "purchase_id":1,
-        // "purchase_header": {
-        //     "purchase_date": "2025-12-22"
-        // },
-        // "purchase_items": [
-        //     {
-        //     "item_id": 101,
-        //     "item_name": "Rices",
-        //     "unit_id": 1,
-        //     "quantity": 10,
-        //     "rate": 50,
-        //     "value": 500,
-        //     "instore_id": 1,
-        //     "outstore_id": 0,
-        //     "can_order_status": 1
-        //     },
-        //     {
-        //     "item_id": 102,
-        //     "item_name": "Sugar",
-        //     "unit_id": 1,
-        //     "quantity": 5,
-        //     "rate": 40,
-        //     "value": 200,
-        //     "instore_id": 1,
-        //     "outstore_id": 0,
-        //     "can_order_status": 1
-        //     },
-        //     {
-        //     "item_id": 103,
-        //     "item_name": "Oil",
-        //     "unit_id": 2,
-        //     "quantity": 2,
-        //     "rate": 150,
-        //     "value": 300,
-        //     "instore_id": 1,
-        //     "outstore_id": 0,
-        //     "can_order_status": 0
-        //     }
-        // ]
-        // }
+  // {
+  // "purchase_mode":"1",
+  // "purchase_id":1,
+  // "purchase_header": {
+  //     "purchase_date": "2025-12-22"
+  // },
+  // "purchase_items": [
+  //     {
+  //     "item_id": 101,
+  //     "item_name": "Rices",
+  //     "unit_id": 1,
+  //     "quantity": 10,
+  //     "rate": 50,
+  //     "value": 500,
+  //     "instore_id": 1,
+  //     "outstore_id": 0,
+  //     "can_order_status": 1
+  //     },
+  //     {
+  //     "item_id": 102,
+  //     "item_name": "Sugar",
+  //     "unit_id": 1,
+  //     "quantity": 5,
+  //     "rate": 40,
+  //     "value": 200,
+  //     "instore_id": 1,
+  //     "outstore_id": 0,
+  //     "can_order_status": 1
+  //     },
+  //     {
+  //     "item_id": 103,
+  //     "item_name": "Oil",
+  //     "unit_id": 2,
+  //     "quantity": 2,
+  //     "rate": 150,
+  //     "value": 300,
+  //     "instore_id": 1,
+  //     "outstore_id": 0,
+  //     "can_order_status": 0
+  //     }
+  // ]
+  // }
 
 
   try {
@@ -879,11 +912,11 @@ export const submitpurchase = async (req, res) => {
 };
 
 export const cancelPurchaseItem = async (req, res) => {
-  
-//   {
-//   "purchase_id": 1,
-//   "item_id": 101
-// }
+
+  //   {
+  //   "purchase_id": 1,
+  //   "item_id": 101
+  // }
 
   try {
     const register_id = req.user.register_id;
@@ -935,10 +968,10 @@ export const cancelPurchaseItem = async (req, res) => {
 };
 
 export const cancelPurchase = async (req, res) => {
-  
-//   {
-//   "purchase_id": 1
-// }
+
+  //   {
+  //   "purchase_id": 1
+  // }
   try {
     const register_id = req.user.register_id;
     const user_id = req.user.user_id;
@@ -1091,12 +1124,12 @@ export const getPurchaseEditData = async (req, res) => {
   }
 };
 export const getDashboardDatas = async (req, res) => {
- 
-//  {
-//     "chartmode":"year"
-// }
+
+  //  {
+  //     "chartmode":"year"
+  // }
   try {
-    const { chartmode ,date} = req.body;
+    const { chartmode, date } = req.body;
     const register_id = req.user.register_id;
 
     // if (!chartmode) {
@@ -1119,7 +1152,7 @@ export const getDashboardDatas = async (req, res) => {
     const tenantDB = getTenantPool(tenantRes.rows[0].db_name);
 
     /* ---- FETCH DATA ---- */
-    const DashboardDatas = await productmodel.getDashboardDatas(tenantDB,chartmode ,date);
+    const DashboardDatas = await productmodel.getDashboardDatas(tenantDB, chartmode, date);
 
     if (!DashboardDatas) {
       return res.json({
@@ -1142,7 +1175,7 @@ export const getDashboardDatas = async (req, res) => {
 };
 export const getChartdetails = async (req, res) => {
   try {
-    const { chartmode} = req.body;
+    const { chartmode } = req.body;
     const register_id = req.user.register_id;
 
     /* ---- GET TENANT DB ---- */
@@ -1158,7 +1191,7 @@ export const getChartdetails = async (req, res) => {
     const tenantDB = getTenantPool(tenantRes.rows[0].db_name);
 
     /* ---- FETCH DATA ---- */
-    const DashboardDatas = await productmodel.getChartdetails(tenantDB,chartmode );
+    const DashboardDatas = await productmodel.getChartdetails(tenantDB, chartmode);
 
     if (!DashboardDatas) {
       return res.json({
@@ -1311,6 +1344,203 @@ export const getDeliveryOrderDetails = async (req, res) => {
   } catch (err) {
     console.error(err);
     return res.status(500).json({ status: 0, message: "Server error" });
+  }
+};
+export const Superdealdata = async (req, res) => {
+  try {
+    const register_id = req.user.register_id;
+
+    // 1. Get tenant DB
+    const tenantQuery = `
+      SELECT db_name 
+      FROM tbl_tenant_databases 
+      WHERE register_id = $1
+    `;
+    const result = await pool.query(tenantQuery, [register_id]);
+
+    if (result.rows.length === 0) {
+      return res.status(400).json({
+        status: 0,
+        message: "Store not found"
+      });
+    }
+
+    const tenantDB = getTenantPool(result.rows[0].db_name);
+
+    // 2. Call model
+    const response = await productmodel.Superdealdata(tenantDB);
+
+    return res.status(200).json(response);
+
+  } catch (err) {
+    console.error("Superdealdata error:", err);
+    return res.status(500).json({
+      status: 0,
+      message: "Server error",
+      error: err.message
+    });
+  }
+};
+
+export const Superdealmanage = async (req, res) => {
+  try {
+    const register_id = req.user.register_id;
+    const { itmid, mode, disper } = req.body;
+
+    if (!itmid || !mode) {
+      return res.status(400).json({
+        status: 0,
+        message: "Item ID & Mode required"
+      });
+    }
+
+    const tenantQuery = `
+      SELECT db_name 
+      FROM tbl_tenant_databases 
+      WHERE register_id = $1
+    `;
+
+    const result = await pool.query(tenantQuery, [register_id]);
+
+    if (!result.rows.length) {
+      return res.status(400).json({
+        status: 0,
+        message: "Store not found"
+      });
+    }
+
+    const tenantDB = getTenantPool(result.rows[0].db_name);
+
+    const response = await productmodel.Superdealmanage(
+      tenantDB,
+      itmid,
+      Number(mode),
+      Number(disper)
+    );
+
+    return res.status(200).json(response);
+
+  } catch (err) {
+    console.error("Superdealmanage error:", err);
+    return res.status(500).json({
+      status: 0,
+      message: "Server error",
+      error: err.message
+    });
+  }
+};
+export const StockReport = async (req, res) => {
+  try {
+    const register_id = req.user.register_id;
+    const { reporttyp } = req.body;
+
+    const tenantQuery = `
+      SELECT db_name 
+      FROM tbl_tenant_databases 
+      WHERE register_id = $1
+    `;
+
+    const result = await pool.query(tenantQuery, [register_id]);
+
+    if (!result.rows.length) {
+      return res.status(400).json({
+        status: 0,
+        message: "Store not found"
+      });
+    }
+
+    const tenantDB = getTenantPool(result.rows[0].db_name);
+
+    const response = await productmodel.StockReport(
+      tenantDB,
+      reporttyp
+    );
+
+    return res.status(200).json(response);
+
+  } catch (err) {
+    console.error("Stock Report error:", err);
+    return res.status(500).json({
+      status: 0,
+      message: "Server error",
+      error: err.message
+    });
+  }
+};
+export const Searchdata = async (req, res) => {
+  try {
+    const register_id = req.user.register_id;
+    const { searchtxt } = req.body;
+
+    const tenantQuery = `
+      SELECT db_name 
+      FROM tbl_tenant_databases 
+      WHERE register_id = $1
+    `;
+
+    const result = await pool.query(tenantQuery, [register_id]);
+
+    if (!result.rows.length) {
+      return res.status(400).json({
+        status: 0,
+        message: "Store not found"
+      });
+    }
+
+    const tenantDB = getTenantPool(result.rows[0].db_name);
+
+    const response = await productmodel.Searchdata(
+      tenantDB,
+      searchtxt
+    );
+
+    return res.status(200).json(response);
+
+  } catch (err) {
+    console.error("Searchdata error:", err);
+    return res.status(500).json({
+      status: 0,
+      message: "Server error",
+      error: err.message
+    });
+  }
+};
+export const SearchItems = async (req, res) => {
+  try {
+    const register_id = req.user.register_id;
+    const { searchtxt } = req.body;
+
+    const tenantQuery = `
+      SELECT db_name 
+      FROM tbl_tenant_databases 
+      WHERE register_id = $1
+    `;
+
+    const result = await pool.query(tenantQuery, [register_id]);
+
+    if (!result.rows.length) {
+      return res.status(400).json({
+        status: 0,
+        message: "Store not found"
+      });
+    }
+
+    const tenantDB = getTenantPool(result.rows[0].db_name);
+
+    const response = await productmodel.SearchItems(
+      tenantDB,
+      searchtxt
+    );
+
+    return res.status(200).json(response);
+
+  } catch (err) {
+    console.error("Searchdata error:", err);
+    return res.status(500).json({
+      status: 0,
+      message: "Server error",
+      error: err.message
+    });
   }
 };
 

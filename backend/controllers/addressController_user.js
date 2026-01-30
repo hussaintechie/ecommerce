@@ -20,15 +20,44 @@ export const addAddress = async (req, res) => {
       lng,
       is_default,
       full_address,
-
     } = req.body;
+
+    // ✅ VALIDATION START ----------------
+
+    // Name mandatory
+    if (!name || name.trim() === "") {
+      return res.status(400).json({
+        status: 0,
+        message: "Name is required",
+      });
+    }
+
+    // Phone mandatory
+    if (!phone) {
+      return res.status(400).json({
+        status: 0,
+        message: "Phone number is required",
+      });
+    }
+
+    // Phone must be numeric & 10 digits
+    const phoneRegex = /^[0-9]{10}$/;
+    if (!phoneRegex.test(phone)) {
+      return res.status(400).json({
+        status: 0,
+        message: "Phone number must be exactly 10 digits",
+      });
+    }
+
+    // ✅ VALIDATION END ------------------
 
     const tenantPool = await AddressModel.getTenantDB(store_id);
 
     const address_id = await AddressModel.addAddress(tenantPool, {
       user_id,
+      store_id,
       address_type,
-      name,
+      name: name.trim(),
       phone,
       pincode,
       state,
@@ -41,7 +70,6 @@ export const addAddress = async (req, res) => {
       lng,
       is_default,
       full_address,
-
     });
 
     return res.json({
@@ -56,15 +84,34 @@ export const addAddress = async (req, res) => {
 };
 
 
+
 export const editAddress = async (req, res) => {
   try {
     const store_id = req.user.register_id;
-    const user_id = req.user.user_id; // used to verify ownership
+    const user_id = req.user.user_id;
     const { address_id } = req.params;
+    const { name, phone } = req.body;
+
+    // ✅ VALIDATION
+    if (name !== undefined && name.trim() === "") {
+      return res.status(400).json({
+        status: 0,
+        message: "Name cannot be empty",
+      });
+    }
+
+    if (phone !== undefined) {
+      const phoneRegex = /^[0-9]{10}$/;
+      if (!phoneRegex.test(phone)) {
+        return res.status(400).json({
+          status: 0,
+          message: "Phone number must be exactly 10 digits",
+        });
+      }
+    }
 
     const tenantPool = await AddressModel.getTenantDB(store_id);
 
-    // Ensure user owns the address
     const address = await AddressModel.getAddressDetails(tenantPool, address_id);
     if (!address || address.user_id !== user_id) {
       return res.status(403).json({ status: 0, message: "Unauthorized update" });
@@ -78,6 +125,8 @@ export const editAddress = async (req, res) => {
     return res.status(500).json({ status: 0, message: err.message });
   }
 };
+
+
 
 
 export const deleteAddress = async (req, res) => {
@@ -106,7 +155,7 @@ export const deleteAddress = async (req, res) => {
 
 export const listAddresses = async (req, res) => {
   try {
-    const store_id = req.user.register_id;
+    const store_id = req.user?.register_id || req.body.register_id;
     const user_id = req.user.user_id;
 
     const tenantPool = await AddressModel.getTenantDB(store_id);

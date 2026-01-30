@@ -22,24 +22,39 @@ export const CustomerModel = {
 
     /* ---------------- DATA QUERY (UNCHANGED) ---------------- */
     const dataQuery = `
-      SELECT 
-        u.user_id AS id,
-        u.name,
-        u.phone,
-        u.full_address,
-        COALESCE(COUNT(o.order_id), 0) AS total_orders,
-        MAX(o.created_at) AS last_order
-      FROM tbl_address u
-      LEFT JOIN tbl_master_orders o 
-        ON o.user_id = u.user_id
-      WHERE u.name ILIKE $1
-      GROUP BY 
-        u.user_id,
-        u.name,
-        u.phone,
-        u.full_address
-      ORDER BY u.user_id DESC
-      LIMIT $2 OFFSET $3
+     SELECT 
+  a.user_id AS id,
+  a.name,
+  a.phone,
+  a.full_address,
+
+  COALESCE(COUNT(o.order_id), 0) AS total_orders,
+  MAX(o.created_at) AS last_order
+
+FROM (
+  -- ✅ ONE address per user (latest)
+  SELECT DISTINCT ON (user_id)
+    user_id,
+    name,
+    phone,
+    full_address
+  FROM tbl_address
+  ORDER BY user_id, address_id DESC
+) a
+
+LEFT JOIN tbl_master_orders o
+  ON o.user_id = a.user_id
+
+WHERE a.name ILIKE $1
+
+GROUP BY
+  a.user_id,
+  a.name,
+  a.phone,
+  a.full_address
+
+ORDER BY a.user_id DESC
+LIMIT $2 OFFSET $3;
     `;
 
     const customersRes = await tenantDB.query(dataQuery, [
