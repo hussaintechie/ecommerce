@@ -1,0 +1,58 @@
+CREATE TABLE tbl_register (
+    register_id SERIAL PRIMARY KEY,
+    phone VARCHAR(15) UNIQUE NOT NULL,
+    store_name VARCHAR(255) NOT NULL,
+    email_id VARCHAR(255) UNIQUE NOT NULL,
+    is_default BOOLEAN DEFAULT false,
+    created_at TIMESTAMP DEFAULT NOW()
+);
+CREATE TABLE tbl_login (
+    user_id SERIAL PRIMARY KEY,
+    register_id INT ,
+    email VARCHAR(255) UNIQUE NOT NULL,
+    password VARCHAR(255),
+    otp VARCHAR(6),
+    added_by VARCHAR(26),
+    name VARCHAR(26),
+    phone VARCHAR(26),
+    user_role VARCHAR(10) CHECK (user_role IN ('admin','user')) NOT NULL DEFAULT 'user',
+    is_first_login BOOLEAN DEFAULT TRUE,
+    otp_expiry TIMESTAMP,
+    created_at TIMESTAMP DEFAULT NOW(),
+
+    CONSTRAINT fk_login_register FOREIGN KEY (register_id)
+        REFERENCES tbl_register (register_id)
+        ON DELETE CASCADE
+);
+
+CREATE TABLE tbl_tenant_databases (
+    tenant_id SERIAL PRIMARY KEY,
+    register_id INT REFERENCES tbl_register(register_id),
+    db_name VARCHAR(255) UNIQUE,
+    db_host VARCHAR(255) DEFAULT 'localhost',
+    db_user VARCHAR(255),
+    db_pass VARCHAR(255),
+    port int,
+    created_at TIMESTAMP DEFAULT NOW()
+);
+
+
+
+
+
+
+---------alter----------------
+-------table--------tbl_login------
+alter table tbl_login 
+add column added_by VARCHAR(26) DEFAULT user
+
+alter table tbl_login 
+add column name VARCHAR(26) 
+alter table tbl_login 
+add column phone VARCHAR(26) 
+
+--------------------------------------------------------
+-------------tbl_register-------------------------
+alter table tbl_address
+add column phone varchar (26)
+
