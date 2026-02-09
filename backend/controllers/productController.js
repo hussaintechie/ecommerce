@@ -581,11 +581,7 @@ export const uploadToS3 = async (file) => {
       Key: fileName,
       Body: file.buffer,
       ContentType: file.mimetype,
-<<<<<<< HEAD
       // ACL: "public-read",
-=======
-      ACL: "public-read",
->>>>>>> 8387add9b049a7dec979a89b49372306e8972fbf
     });
 
     const result = await s3.send(command);
@@ -685,7 +681,6 @@ export const saveItem = async (req, res) => {
     }
     var  imageUrl ='';
 
-<<<<<<< HEAD
     if (file) {
       // return res.status(400).json({
       //   status: 0,
@@ -694,13 +689,6 @@ export const saveItem = async (req, res) => {
           // 📤 Upload to S3
     console.log("📤 Uploading to S3...");
      imageUrl = await uploadToS3(file);
-=======
-    if (!file) {
-      return res.status(400).json({
-        status: 0,
-        message: "File not received",
-      });
->>>>>>> 8387add9b049a7dec979a89b49372306e8972fbf
     }
 
     // 🔍 Get tenant DB
@@ -715,15 +703,8 @@ export const saveItem = async (req, res) => {
       return res.status(400).json({ status: 0, message: "Store not found" });
     }
 
-    // 📤 Upload to S3
-    console.log("📤 Uploading to S3...");
-    const imageUrl = await uploadToS3(file);
-    product.image = imageUrl;
 
-<<<<<<< HEAD
     product.image = imageUrl;
-=======
->>>>>>> 8387add9b049a7dec979a89b49372306e8972fbf
     console.log("✅ Image uploaded:", imageUrl);
 
     // 💾 Save item

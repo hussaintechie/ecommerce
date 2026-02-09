@@ -189,105 +189,98 @@ const Lowstockdetails = async (
 ) => {
   try {
     const offset = (page - 1) * limit;
-    const hasSearch = search && search.trim() !== "";
+    const hasSearch = search.trim() !== "";
 
-    const whereSearchData = hasSearch
-      ? `AND LOWER(p.title) LIKE LOWER($3)`
-      : "";
-
-    const whereSearchCount = hasSearch
-      ? `AND LOWER(p.title) LIKE LOWER($1)`
-      : "";
-
-    let whereStockFilter = "";
+    /* ---------------- STOCK FILTER ---------------- */
+    let stockCondition = "1=1";
 
     if (filtertyp === "low") {
-
-      whereStockFilter = `
-        AND (
-          COALESCE(p.openbalqty + COALESCE(st.current_stock,0), p.openbalqty) > 0
-          AND
-          COALESCE(p.openbalqty + COALESCE(st.current_stock,0), p.openbalqty)
-              <= COALESCE(p.lowstqty,0)
-        )
+      stockCondition = `
+        stock_qty > 0
+        AND stock_qty <= COALESCE(lowstqty,0)
       `;
-    }
-    else if (filtertyp === "out") {
-
-      whereStockFilter = `
-        AND (
-          COALESCE(p.openbalqty + COALESCE(st.current_stock,0), p.openbalqty) <= 0
-        )
-      `;
+    } else if (filtertyp === "out") {
+      stockCondition = `stock_qty <= 0`;
     }
 
+    /* ---------------- DATA QUERY ---------------- */
     const dataSql = `
-      SELECT
-        p.product_id AS id,
-        p.title AS name,
-        p.lowstqty,
-        p.itmsts,
-        COALESCE(
-          p.openbalqty + COALESCE(st.current_stock, 0),
-          p.openbalqty
-        ) AS stock,
-        COALESCE(img.image_url, '') AS image
-      FROM tbl_master_product p
-      LEFT JOIN (
+      WITH stock_cte AS (
         SELECT
-          itmid,
-           purchase_date,
-          SUM(
-            CASE
-              WHEN instoreid > 0 THEN stockqty
-              WHEN outstoreid > 0 THEN -stockqty
-              ELSE 0
-            END
-          ) AS current_stock
-        FROM stock_transaction
-        WHERE COALESCE(itmcandel, 0) = 0
-          AND COALESCE(canordersts, 0) = 0
-        GROUP BY itmid,purchase_date
-      ) st ON st.itmid = p.product_id and COALESCE(p.openbaldate,'2020-01-01')<=st.purchase_date
+          p.product_id,
+          p.title,
+          p.lowstqty,
+          p.itmsts,
+          COALESCE(p.openbalqty,0) +
+          COALESCE((
+            SELECT SUM(
+              CASE
+                WHEN instoreid > 0 THEN stockqty
+                WHEN outstoreid > 0 THEN -stockqty
+                ELSE 0
+              END
+            )
+            FROM stock_transaction st
+            WHERE st.itmid = p.product_id
+              AND COALESCE(st.itmcandel,0) = 0
+              AND COALESCE(st.canordersts,0) = 0
+              AND COALESCE(p.openbaldate,'2020-01-01') <= st.purchase_date
+          ),0) AS stock_qty
+        FROM tbl_master_product p
+        WHERE p.itmsts = 1
+        ${hasSearch ? "AND LOWER(p.title) LIKE LOWER($3)" : ""}
+      )
+      SELECT
+        s.product_id AS id,
+        s.title AS name,
+        s.lowstqty,
+        s.itmsts,
+        s.stock_qty AS stock,
+        COALESCE(img.image_url,'') AS image
+      FROM stock_cte s
       LEFT JOIN (
         SELECT DISTINCT ON (product_id)
           product_id,
           image_url
         FROM tbl_product_images
         ORDER BY product_id, image_url
-      ) img ON img.product_id = p.product_id
-      WHERE p.itmsts = 1
-        ${whereSearchData}
-        ${whereStockFilter}
-      ORDER BY p.product_id DESC
+      ) img ON img.product_id = s.product_id
+      WHERE ${stockCondition}
+      ORDER BY s.product_id DESC
       LIMIT $1 OFFSET $2
     `;
 
+    /* ---------------- COUNT QUERY ---------------- */
     const countSql = `
-      SELECT COUNT(*)::int AS count
-      FROM tbl_master_product p
-      LEFT JOIN (
+      WITH stock_cte AS (
         SELECT
-          itmid,
-          purchase_date,
-          SUM(
-            CASE
-              WHEN instoreid > 0 THEN stockqty
-              WHEN outstoreid > 0 THEN -stockqty
-              ELSE 0
-            END
-          ) AS current_stock
-        FROM stock_transaction
-        WHERE COALESCE(itmcandel, 0) = 0
-          AND COALESCE(canordersts, 0) = 0
-        GROUP BY itmid,purchase_date
-      ) st ON st.itmid = p.product_id and COALESCE(openbaldate,'2020-01-01')<=st.purchase_date
-      WHERE p.itmsts = 1
-        ${whereSearchCount}
-        ${whereStockFilter}
+          p.product_id,
+          p.lowstqty,
+          COALESCE(p.openbalqty,0) +
+          COALESCE((
+            SELECT SUM(
+              CASE
+                WHEN instoreid > 0 THEN stockqty
+                WHEN outstoreid > 0 THEN -stockqty
+                ELSE 0
+              END
+            )
+            FROM stock_transaction st
+            WHERE st.itmid = p.product_id
+              AND COALESCE(st.itmcandel,0) = 0
+              AND COALESCE(st.canordersts,0) = 0
+              AND COALESCE(p.openbaldate,'2020-01-01') <= st.purchase_date
+          ),0) AS stock_qty
+        FROM tbl_master_product p
+        WHERE p.itmsts = 1
+        ${hasSearch ? "AND LOWER(p.title) LIKE LOWER($1)" : ""}
+      )
+      SELECT COUNT(*)::int AS count
+      FROM stock_cte
+      WHERE ${stockCondition}
     `;
 
-    /* ---------- VALUES ---------- */
+    /* ---------------- VALUES ---------------- */
     const dataValues = hasSearch
       ? [limit, offset, `%${search}%`]
       : [limit, offset];
@@ -303,8 +296,7 @@ const Lowstockdetails = async (
       status: 1,
       message: "Stock items fetched successfully",
       data: dataRes.rows,
-      total: countRes.rows[0]?.count || 0,
-      sql: dataSql,
+      total: countRes.rows[0]?.count || 0
     };
 
   } catch (error) {
@@ -316,6 +308,7 @@ const Lowstockdetails = async (
     };
   }
 };
+
 
 const catitems = async (tenantDB, store_id, cate_id) => {
 
@@ -331,19 +324,8 @@ const catitems = async (tenantDB, store_id, cate_id) => {
   itm.mrp,
   itm.description,
   unit.unitname as unit,
-  COALESCE(
-    itm.openbalqty + COALESCE(st.current_stock, 0),
-    itm.openbalqty
-    ) AS current_stock,
-  prdimg.image_url AS image
-FROM tbl_master_product itm
-inner join unitofmeasure_master as unit on itm.unit = unit.unitid
-LEFT JOIN tbl_product_images prdimg
-  ON itm.product_id = prdimg.product_id
-  LEFT JOIN (
-        SELECT
-          itmid,
-		      purchase_date,
+       COALESCE(
+     COALESCE(itm.openbalqty,0)+COALESCE((SELECT
           SUM(
             CASE
               WHEN instoreid > 0 THEN stockqty
@@ -352,10 +334,17 @@ LEFT JOIN tbl_product_images prdimg
             END
           ) AS current_stock
         FROM stock_transaction
-        WHERE COALESCE(itmcandel, 0) = 0
-          AND COALESCE(canordersts, 0) = 0
-        GROUP BY itmid,purchase_date
-      ) st ON st.itmid = itm.product_id  and COALESCE(openbaldate,'2020-01-01')<=st.purchase_date
+        WHERE 
+		  itmid=itm.product_id
+		  AND COALESCE(itmcandel, 0) = 0
+          AND COALESCE(canordersts, 0) = 0  
+		  AND COALESCE(itm.openbaldate,'2020-01-01')<=purchase_date
+		 ),0),0) as current_stock,
+  prdimg.image_url AS image
+FROM tbl_master_product itm
+inner join unitofmeasure_master as unit on itm.unit = unit.unitid
+LEFT JOIN tbl_product_images prdimg
+  ON itm.product_id = prdimg.product_id
 WHERE itm.categories_id = ${cate_id}
 ORDER BY itm.product_id`;
 
@@ -565,17 +554,8 @@ END AS price,
 price AS "oldPrice",
 img.image_url as img,
 unit.unitname as "weight",
-COALESCE(
-    pro.openbalqty + COALESCE(st.current_stock, 0),
-    pro.openbalqty
-    ) AS current_stock
-from tbl_master_product as pro left join tbl_product_images as img 
-on pro.product_id = img.product_id
-inner join unitofmeasure_master as unit on pro.unit = unit.unitid
-LEFT JOIN (
-        SELECT
-          itmid,
-		 purchase_date,
+  COALESCE(
+     COALESCE(pro.openbalqty,0)+COALESCE((SELECT
           SUM(
             CASE
               WHEN instoreid > 0 THEN stockqty
@@ -584,10 +564,15 @@ LEFT JOIN (
             END
           ) AS current_stock
         FROM stock_transaction
-        WHERE COALESCE(itmcandel, 0) = 0
-          AND COALESCE(canordersts, 0) = 0
-        GROUP BY itmid,purchase_date
-      ) st ON st.itmid = pro.product_id  and COALESCE(openbaldate,'2020-01-01')<=st.purchase_date`;
+        WHERE 
+		  itmid=pro.product_id
+		  AND COALESCE(itmcandel, 0) = 0
+          AND COALESCE(canordersts, 0) = 0  
+		  AND COALESCE(pro.openbaldate,'2020-01-01')<=purchase_date
+		 ),0),0) as current_stock     
+from tbl_master_product as pro left join tbl_product_images as img 
+on pro.product_id = img.product_id
+inner join unitofmeasure_master as unit on pro.unit = unit.unitid`;
 
     let dealitmsql = ` where discount_per > 0  and discount_sts =1`;
 
@@ -1496,48 +1481,48 @@ const getDashboardDatas = async (tenantDB, chartmode, date) => {
     /* ---------------- LOW STOCK ---------------- */
 
     const lowstocksql = `
-       SELECT
-        p.product_id AS id,
-        p.title AS name,
-        p.lowstqty,
-        p.itmsts,
-        COALESCE(
-          p.openbalqty + COALESCE(st.current_stock, 0),
-          p.openbalqty
-        ) AS stock,
-        COALESCE(img.image_url, '') AS image
-      FROM tbl_master_product p
-      LEFT JOIN (
-        SELECT
-          itmid,
-           purchase_date,
-          SUM(
-            CASE
-              WHEN instoreid > 0 THEN stockqty
-              WHEN outstoreid > 0 THEN -stockqty
-              ELSE 0
-            END
-          ) AS current_stock
-        FROM stock_transaction
-        WHERE COALESCE(itmcandel, 0) = 0
-          AND COALESCE(canordersts, 0) = 0
-        GROUP BY itmid ,purchase_date
-      ) st ON st.itmid = p.product_id and COALESCE(openbaldate,'2020-01-01')<=st.purchase_date
-      LEFT JOIN (
-        SELECT DISTINCT ON (product_id)
-          product_id,
-          image_url
-        FROM tbl_product_images
-        ORDER BY product_id, image_url
-      ) img ON img.product_id = p.product_id
-      WHERE p.itmsts = 1
-        AND (
-          COALESCE(p.openbalqty + COALESCE(st.current_stock,0), p.openbalqty) > 0
-          AND
-          COALESCE(p.openbalqty + COALESCE(st.current_stock,0), p.openbalqty)
-              <= COALESCE(p.lowstqty,0)
-        )
-      ORDER BY COALESCE(st.current_stock,0) DESC limit 5
+	
+	select * from(
+	SELECT
+	        p.product_id AS id,
+	        p.title AS name,
+	        p.lowstqty,
+	        p.itmsts,
+			p.openbalqty,
+	           COALESCE(
+	     COALESCE(p.openbalqty,0)+COALESCE((SELECT
+	          SUM(
+	            CASE
+	              WHEN instoreid > 0 THEN stockqty
+	              WHEN outstoreid > 0 THEN -stockqty
+	              ELSE 0
+	            END
+	          ) AS current_stock
+	        FROM stock_transaction
+	        WHERE 
+			  itmid=p.product_id
+			  AND COALESCE(itmcandel, 0) = 0
+	          AND COALESCE(canordersts, 0) = 0  
+			  AND COALESCE(p.openbaldate,'2020-01-01')<=purchase_date
+			 ),0),0) as stock,
+	        COALESCE(img.image_url, '') AS image
+	      FROM tbl_master_product p
+	      LEFT JOIN (
+	        SELECT DISTINCT ON (product_id)
+	          product_id,
+	          image_url
+	        FROM tbl_product_images
+	        ORDER BY product_id, image_url
+	      ) img ON img.product_id = p.product_id
+		  ) as main
+	      WHERE main.itmsts = 1
+	        AND (
+	          COALESCE(main.openbalqty + COALESCE(main.stock,0),main.openbalqty) > 0
+	          AND
+	          COALESCE(main.openbalqty + COALESCE(main.stock,0), main.openbalqty)
+	              <= COALESCE(main.lowstqty,0)
+	        )
+	      ORDER BY COALESCE(main.stock,0) DESC limit 5
     `;
 
     /* ---------------- EXECUTION ---------------- */
@@ -1567,7 +1552,7 @@ const getDashboardDatas = async (tenantDB, chartmode, date) => {
     console.error("DashboardDatas fetch error:", error);
     return {
       status: 0,
-      message: err.message,
+      message: error.message,
       error
     };
   }

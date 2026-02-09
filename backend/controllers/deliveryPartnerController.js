@@ -208,20 +208,11 @@ export const deliveryPartnerLogin = async (req, res) => {
 
     const tenantDB = getTenantPool(tenantRes.rows[0].db_name);
 
-    // 2️⃣ MAIN QUERY (FIXED COLUMN NAME)
-    const query = `
-      SELECT 
-        o.order_id,
-        o.order_no,
-        a.name, 
-        a.phone,
-        a.address,
-        o.order_status
-      FROM tbl_master_orders o
-      JOIN tbl_address a ON a.user_id = o.user_id
-      WHERE o.order_id = $1
-      AND o.order_status = 'out_for_delivery'
-    `;
+    // 2️⃣ Validate driver (TENANT DB)
+    const result = await deliveryPartnerModel.deliveryPartnerLogin(
+      tenantDB,
+      mobile
+    );
 
     if (result.status === 0) {
       return res.status(401).json(result);
